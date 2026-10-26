@@ -1,0 +1,1911 @@
+openapi: 3.0.3
+info:
+  title: ErasMusic REST API
+  description: >-
+    ErasMusic is a social network to meet people that shares the same music taste as you. It uses hybrid architecture API combining Neo4j and PostgreSQL (this should not be in a publicly available swagger but we precise it here for convenience, this will be the case in the whole document).
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Primary API v1 Base Path
+security:
+  - BearerAuth: []
+tags:
+  - name: Authentication
+    description: >-
+      PostgreSQL — User registration, login, session management, and password
+      resets
+  - name: User Profiles
+    description: 'PostgreSQL — Profile data, application preferences, and listening stats'
+  - name: Friends & Social
+    description: >-
+      Neo4j — Social graph connections, friends, and friend request
+      lifecycles
+  - name: Groups
+    description: 'Neo4j — Group management, memberships, and metadata tags'
+  - name: Music Data
+    description: 'Neo4j — Music catalog browsing (artists, songs, genres)'
+  - name: Recommendations
+    description: >-
+      Neo4j — Time-based graph traversal discovery and personalized
+      recommendations
+  - name: Search
+    description: Neo4j — Graph-powered global and domain-specific search
+  - name: Chat
+    description: 'PostgreSQL — Conversations, message history, and participation management'
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Create an account
+      description: >-
+        Creates a new user account in PostgreSQL. Hashes password prior to
+        storage.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate a user
+      description: Validates user credentials and issues session / access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Authenticated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token/session
+      description: Generates a new access token from a valid refresh session.
+      security: []
+      requestBody:
+        required: false
+        description: Required if refresh token is supplied in the body instead of HTTP-only cookies.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: End the current session
+      description: Invalidates active access token or session cookies.
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Session terminated successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get authenticated user's identity
+      description: >-
+        Returns core identity details of current authenticated user from
+        PostgreSQL.
+      responses:
+        '200':
+          description: User identity details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserIdentity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /users/me:
+    get:
+      tags:
+        - User Profiles
+      summary: Get my profile
+      description: Retrieves complete profile for current logged in user.
+      responses:
+        '200':
+          description: Profile object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - User Profiles
+      summary: Update my profile
+      description: Updates current user's profile metadata in PostgreSQL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags:
+        - User Profiles
+      summary: Delete my account
+      description: 'Permanently deletes user account, profile, and associated records.'
+      responses:
+        '204':
+          description: Account deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+          
+  '/users/{userId}':
+    get:
+      tags:
+        - User Profiles
+      summary: View a public profile
+      description: Retrieves public profile for specified user ID.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: usr_123
+      responses:
+        '200':
+          description: Public user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /friends:
+    get:
+      tags:
+        - Friends & Social
+      summary: List my friends
+      description: Retrieves friend list from Neo4j social graph.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Paginated friends list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - friends
+                  - pagination
+                properties:
+                  friends:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  '/friends/{userId}':
+    get:
+      tags:
+        - Friends & Social
+      summary: Get friendship status with a user
+      description: >-
+        Returns the friendship status between the authenticated user and the
+        specified user. The status indicates whether the users are friends,
+        have a pending friend request, or have no existing relationship.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID of the user whose friendship status you want to check.
+          schema:
+            type: string
+          examples:
+            default:
+              value: usr_456
+      responses:
+        '200':
+          description: Friendship status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendshipStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Friends & Social
+      summary: Remove a friend
+      description: Deletes friendship relationship in Neo4j graph.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Friendship removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /friend-requests:
+    post:
+      tags:
+        - Friends & Social
+      summary: Send a friend request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetUserId
+              properties:
+                targetUserId:
+                  type: string
+                  example: usr_456
+      responses:
+        '201':
+          description: Friend request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags:
+        - Friends & Social
+      summary: List incoming and outgoing requests
+      parameters:
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum:
+              - incoming
+              - outgoing
+              - all
+            default: all
+      responses:
+        '200':
+          description: Friend requests list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FriendRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  '/friend-requests/{requestId}/accept':
+    post:
+      tags:
+        - Friends & Social
+      summary: Accept a request
+      description: >-
+        Updates transactional status in PostgreSQL and creates bidirectional
+        friendship relationship in Neo4j.
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request accepted and friendship established
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  '/friend-requests/{requestId}/decline':
+    post:
+      tags:
+        - Friends & Social
+      summary: Decline a request
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Request declined
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /groups:
+    get:
+      tags:
+        - Groups
+      summary: Discover or list groups
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGroups'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Groups
+      summary: Create a group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupCreate'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  '/groups/{groupId}':
+    get:
+      tags:
+        - Groups
+      summary: Get group details
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: grp_123
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Groups
+      summary: Update group details
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Group details updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags:
+        - Groups
+      summary: Delete a group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Group deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  '/groups/{groupId}/members':
+    get:
+      tags:
+        - Groups
+      summary: List group members
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Group members list
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Groups
+      summary: Join a group or add a member
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: >-
+                    Optional target user ID (admin action); defaults to current
+                    user.
+      responses:
+        '200':
+          description: User added to group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  '/groups/{groupId}/members/me':
+    delete:
+      tags:
+        - Groups
+      summary: Leave a group
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Current user left the group
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  '/groups/{groupId}/tags':
+    get:
+      tags:
+        - Groups
+      summary: Get group tags
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Group tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupTag'
+              example:
+                - type: artist
+                  artistId: artist_1
+                  name: Arctic Monkeys
+                - type: genre
+                  name: indie
+                - type: genre
+                  name: alternative
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Groups
+      summary: Replace group tags
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tags
+              properties:
+                tags:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/GroupTag'
+            example:
+              tags:
+                - type: artist
+                  artistId: artist_1
+                  name: Arctic Monkeys
+                - type: genre
+                  name: indie
+      responses:
+        '200':
+          description: Tags updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /artists:
+    get:
+      tags:
+        - Music Data
+      summary: Browse or list artists
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Artist details
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - artists
+                  - pagination
+                properties: 
+                  artists:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Artist'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  '/artists/{artistId}':
+    get:
+      tags:
+        - Music Data
+      summary: Get artist details
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: artist_1
+      responses:
+        '200':
+          description: Artist details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artist'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /songs:
+    get:
+      tags:
+        - Music Data
+      summary: Browse or list songs
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Song catalog list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - songs
+                  - pagination
+                properties: 
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Song'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  '/songs/{songId}':
+    get:
+      tags:
+        - Music Data
+      summary: Get song details
+      parameters:
+        - name: songId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: song_1
+      responses:
+        '200':
+          description: Song details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /genres:
+    get:
+      tags:
+        - Music Data
+      summary: Browse genres
+      responses:
+        '200':
+          description: List of genres
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - genres
+                  - pagination
+                properties: 
+                  genres:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Genre'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  '/genres/{genreId}':
+    get:
+      tags:
+        - Music Data
+      summary: Get genre details
+      parameters:
+        - name: genreId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Genre details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Genre'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /recommendations/friends/by-artists:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommend users based on artists you listen to.
+      description: Returns users who have also listened to artists you listened to during the selected time period, grouped by artist. Each artist can have up to 20 recommended users.
+      parameters:
+        - $ref: '#/components/parameters/Period'
+        - name: limit
+          in: query
+          description: Maximum artists to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Recommended users grouped by artist
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - pagination
+                properties:
+                  items:
+                    type: array
+                    description: Artists and their recommended users
+                    items:
+                      type: object
+                      required:
+                        - artist
+                        - users
+                      properties:
+                        artist:
+                          $ref: '#/components/schemas/Artist'
+                        users:
+                          type: array
+                          description: Up to 20 users associated with this artist
+                          maxItems: 20
+                          items:
+                            $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recommendations/friends/by-songs:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommend users based on songs you listen to.
+      description: Returns users who have also listened to songs you listened to during the selected time period, grouped by songs. Each songs can have up to 20 recommended users.
+      parameters:
+        - $ref: '#/components/parameters/Period'
+        - name: limit
+          in: query
+          description: Maximum songs to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Recommended users grouped by songs
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - pagination
+                properties:
+                  items:
+                    type: array
+                    description: Songs and their recommended users
+                    items:
+                      type: object
+                      required:
+                        - songs
+                        - users
+                      properties:
+                        songs:
+                          $ref: '#/components/schemas/Song'
+                        users:
+                          type: array
+                          description: Up to 20 users associated with this songs
+                          maxItems: 20
+                          items:
+                            $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recommendations/friends/by-friends:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommend users through your closest friends.
+      description: >-
+        Returns users who are not yet your friends but share at least one mutual
+        friend with you. Recommendations are grouped by mutual friend and
+        prioritized based on how close you are to each mutual friend. Each mutual
+        friend can have up to 20 recommended users.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of mutual-friend groups to return per page.
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: >-
+            Successfully retrieved recommended users, grouped by mutual friend
+            and ordered by the closeness of your relationship with each friend.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - pagination
+                properties:
+                  items:
+                    type: array
+                    description: >-
+                      Groups of recommended users, each associated with a mutual
+                      friend.
+                    items:
+                      type: object
+                      required:
+                        - friends
+                        - users
+                      properties:
+                        friends:
+                          $ref: '#/components/schemas/User'
+                        users:
+                          type: array
+                          description: >-
+                            Users who are not yet your friends and who share
+                            this mutual friend with you. Each group contains
+                            at most 20 recommended users.
+                          maxItems: 20
+                          items:
+                            $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recommendations/groups/by-artists:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommend groups based on artists you listen to.
+      description: Returns groups about artists you listened to during the selected time period, grouped by artist and sorted by by the artist you like the most. Each artist can have up to 20 recommended groups.
+      parameters:
+        - $ref: '#/components/parameters/Period'
+        - name: limit
+          in: query
+          description: Maximum artists to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Recommended groups grouped by artist
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - pagination
+                properties:
+                  items:
+                    type: array
+                    description: Artists and their recommended groups
+                    items:
+                      type: object
+                      required:
+                        - artists
+                        - groups
+                      properties:
+                        artists:
+                          $ref: '#/components/schemas/Artist'
+                        groups:
+                          type: array
+                          description: Up to 20 groups associated with this artist
+                          maxItems: 20
+                          items:
+                            $ref: '#/components/schemas/Group'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recommendations/groups/by-genre:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommend groups based on genre you listen to.
+      description: Returns groups about genres you've listened to during the selected time period, grouped by genre. Each genre can have up to 20 recommended groups.
+      parameters:
+        - $ref: '#/components/parameters/Period'
+        - name: limit
+          in: query
+          description: Maximum genre to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Recommended groups grouped by genre
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - pagination
+                properties:
+                  items:
+                    type: array
+                    description: Songs and their recommended users
+                    items:
+                      type: object
+                      required:
+                        - genre
+                        - groups
+                      properties:
+                        genre:
+                          $ref: '#/components/schemas/Genre'
+                        groups:
+                          type: array
+                          description: Up to 20 groups associated with this genre
+                          maxItems: 20
+                          items:
+                            $ref: '#/components/schemas/Group'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recommendations/groups/by-friends:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommend groups through your closest friends.
+      description: >-
+        Returns groups you have friends in but you are not part of it yet. Recommendations are grouped by friend and
+        prioritized based on how close you are to each friend. Each friend can have up to 20 recommended groups.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of friends to return per page.
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: >-
+            Successfully retrieved recommended groups, grouped by friend.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                  - pagination
+                properties:
+                  items:
+                    type: array
+                    description: >-
+                      Groups of recommended grouped, each associated with a friend.
+                    items:
+                      type: object
+                      required:
+                        - friends
+                        - groups
+                      properties:
+                        groups:
+                          $ref: '#/components/schemas/Group'
+                        friends:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /search/users:
+    get:
+      tags:
+        - Search
+      summary: Search people
+      parameters:
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Matching users retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /search/groups:
+    get:
+      tags:
+        - Search
+      summary: Search groups
+      parameters:
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Matching groups retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /chats:
+    get:
+      tags:
+        - Chat
+      summary: List my conversations
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: User chat conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - chats
+                  - pagination
+                properties:
+                  chats:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Chat'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Chat
+      summary: Create a direct or group conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChat'
+      responses:
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chat'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  '/chats/{chatId}':
+    get:
+      tags:
+        - Chat
+      summary: Get conversation details
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: chat_101
+      responses:
+        '200':
+          description: Chat conversation metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chat'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  '/chats/{chatId}/messages':
+    get:
+      tags:
+        - Chat
+      summary: Retrieve messages
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Messages thread
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - messages
+                  - pagination
+                properties:
+                  messages: 
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Chat
+      summary: Send a message
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessage'
+      responses:
+        '201':
+          description: Message posted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  '/chats/{chatId}/members':
+    post:
+      tags:
+        - Chat
+      summary: Add a participant
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  example: usr_789
+      responses:
+        '201':
+          description: Participant added
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - userId
+                  - chatId
+                properties:
+                  userId:
+                    type: string
+                    example: usr_789
+                  chatId:
+                    type: string
+                    example: chat_123
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  '/chats/{chatId}/members/me':
+    delete:
+      tags:
+        - Chat
+      summary: Leave a conversation
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Left conversation
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Wrong chat type, chat cannot be 'direct'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: Maximum items to return
+      required: false
+      schema:
+        type: integer
+        default: 10
+        maximum: 100
+    Page:
+      name: page
+      in: query
+      description: Page number to retrieve (starting at 1)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Period:
+      name: period
+      in: query
+      description: Time window filter
+      required: true
+      schema:
+        type: string
+        enum:
+          - short_term
+          - medium_term
+          - long_term
+    SearchQuery:
+      name: q
+      in: query
+      description: Search term
+      required: true
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPError'
+    Conflict:
+      description: Duplicate key or entity conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPError'
+    UnprocessableEntity:
+      description: Unprocessable Entity - The request was well-formed but was unable to be followed due to semantic errors (e.g., validation failures).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPValidationError'
+    TooManyRequests:
+      description: Too Many Requests - The user has sent too many requests in a given amount of time (rate limiting).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPError'
+    Forbidden:
+      description: Forbidden - The server understood the request but refuses to authorize it (e.g., lacking permissions).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPError'
+    NotFound:
+      description: Not Found - The requested resource could not be found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPError'
+
+    
+    
+  schemas:
+    HTTPError:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: "Not found"
+          
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+            
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          description: Location of the error (e.g., body, query, path)
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          example: ["body", "userId"]
+        msg:
+          type: string
+          description: Human-readable error message
+          example: "field required"
+        type:
+          type: string
+          description: The error type identifier
+          example: "value_error.missing"
+    PaginatedUser:
+      type: object
+      required:
+        - users
+        - pagination
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    PaginatedGroup:
+      type: object
+      required:
+        - groups
+        - pagination
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Pagination:
+          type: object
+          description: Pagination metadata
+          required:
+            - page
+            - limit
+            - totalItems
+            - totalPages
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              description: Current page number
+              example: 2
+            limit:
+              type: integer
+              minimum: 1
+              description: Maximum number of items per page
+              example: 20
+            totalItems:
+              type: integer
+              minimum: 0
+              description: Total number of items available
+              example: 95
+            totalPages:
+              type: integer
+              minimum: 0
+              description: Total number of pages available
+              example: 5
+    AuthRegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          example: alex
+        email:
+          type: string
+          format: email
+          example: alex@example.com
+        password:
+          type: string
+          format: password
+          example: StrongPassword123
+    AuthLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: alex@example.com
+        password:
+          type: string
+          format: password
+          example: StrongPassword123
+    UserIdentity:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_123
+        username:
+          type: string
+          example: alex
+        email:
+          type: string
+          format: email
+          example: alex@example.com
+    AuthTokenResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserIdentity'
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_123
+        username:
+          type: string
+          example: alex
+        avatarUrl:
+          type: string
+          format: uri
+          example: 'https://example.com/avatar.jpg'
+        bio:
+          type: string
+          example: Music enthusiast
+    UserProfileUpdate:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+          format: uri
+          example: 'https://example.com/avatar.jpg'
+        bio:
+          type: string
+          example: Music enthusiast
+    FriendshipStatus:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: usr_456
+        status:
+          type: string
+          enum:
+            - friends
+            - pending_incoming
+            - pending_outgoing
+            - none
+          example: friends
+    FriendRequest:
+      type: object
+      properties:
+        requestId:
+          type: string
+          example: req_789
+        senderId:
+          type: string
+          example: usr_123
+        targetUserId:
+          type: string
+          example: usr_456
+        status:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - declined
+          example: pending
+        createdAt:
+          type: string
+          format: date-time
+    Group:
+      type: object
+      properties:
+        id:
+          type: string
+          example: grp_123
+        name:
+          type: string
+          example: Indie Music Lovers
+        description:
+          type: string
+          example: Discover and discuss indie music
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - indie
+            - alternative
+            - arctic-monkeys
+    GroupCreate:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          example: Indie Music Lovers
+        description:
+          type: string
+          example: Discover and discuss indie music
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - indie
+            - alternative
+            - arctic-monkeys
+    PaginatedGroups:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Artist:
+      type: object
+      properties:
+        id:
+          type: string
+          example: artist_1
+        name:
+          type: string
+          example: Arctic Monkeys
+        profilePicture:
+          type: string
+        spotifyURL:
+          type: string
+    Song:
+      type: object
+      properties:
+        id:
+          type: string
+          example: song_1
+        title:
+          type: string
+          example: Do I Wanna Know?
+        coverLink:
+          type: string
+        spotifyURL:
+          type: string
+        artists:
+          type: array
+          items:
+            type: string
+          example:
+            - Arctic Monkeys
+            - Polar Birds
+    Genre:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Indie Rock
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+          example: chat_101
+        type:
+          type: string
+          enum:
+            - direct
+            - group
+          example: direct
+        participantIds:
+          type: array
+          items:
+            type: string
+          example:
+            - usr_123
+            - usr_456
+    CreateChat:
+      type: object
+      description: If there the type is 'direct' there must be two participantIds.
+      required:
+        - type
+        - participantIds
+      properties:
+        type:
+          type: string
+          enum:
+            - direct
+            - group
+          example: direct
+        participantIds:
+          type: array
+          items:
+            type: string
+          example:
+            - usr_456
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          example: msg_999
+        chatId:
+          type: string
+          example: chat_101
+        senderId:
+          type: string
+          example: usr_123
+        message:
+          type: string
+          example: Have you listened to their new album?
+        createdAt:
+          type: string
+          format: date-time
+    SendMessage:
+      type: object
+      required:
+        - content
+      properties:
+        message:
+          type: string
+          example: Have you listened to their new album?
+        type:
+          type: string
+          enum:
+            - text
+            - media
+          default: text
+    User:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Unique user identifier.
+          example: user_1
+        name:
+          type: string
+          description: User name.
+          example: Alice
+    GroupTag:
+      oneOf:
+        - type: object
+          title: Artist tag
+          required:
+            - type
+            - artistId
+            - name
+          properties:
+            type:
+              type: string
+              enum:
+                - artist
+            artistId:
+              type: string
+              description: ID of the artist in the music catalog.
+              example: artist_1
+            name:
+              type: string
+              description: Artist name.
+              example: Arctic Monkeys
+        - type: object
+          title: Genre tag
+          required:
+            - type
+            - name
+          properties:
+            type:
+              type: string
+              enum:
+                - genre
+            name:
+              type: string
+              description: Genre name.
+              example: indie

@@ -1,3 +1,5 @@
+Use bolt protocol in neo4j browser
+
 # ErasMusic
 
 REST API built with **FastAPI** and **Neo4j**, running with Docker Compose.
