@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+asyncpg
+neo4j
+pydantic
+pydantic[email]
+passlib[argon2]
+pyjwt
+python-dotenv

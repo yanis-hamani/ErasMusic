@@ -39,7 +39,7 @@ paths:
         - Authentication
       summary: Create an account
       description: >-
-        Creates a new user account in PostgreSQL. Hashes password prior to
+        Creates a new user account in PostgreSQL and a User node in Neo4J filled with the psql id. Hashes password prior to
         storage.
       security: []
       requestBody:
@@ -81,8 +81,6 @@ paths:
                 $ref: '#/components/schemas/AuthTokenResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
 
   /auth/refresh:
     post:
@@ -923,10 +921,10 @@ paths:
                     items:
                       type: object
                       required:
-                        - songs
+                        - song
                         - users
                       properties:
-                        songs:
+                        song:
                           $ref: '#/components/schemas/Song'
                         users:
                           type: array
@@ -1471,12 +1469,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/HTTPValidationError'
-    TooManyRequests:
-      description: Too Many Requests - The user has sent too many requests in a given amount of time (rate limiting).
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/HTTPError'
     Forbidden:
       description: Forbidden - The server understood the request but refuses to authorize it (e.g., lacking permissions).
       content:
@@ -1849,7 +1841,7 @@ components:
     SendMessage:
       type: object
       required:
-        - content
+        - message
       properties:
         message:
           type: string

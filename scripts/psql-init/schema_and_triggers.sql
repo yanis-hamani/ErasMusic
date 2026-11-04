@@ -9,6 +9,12 @@ CREATE TABLE users (
     bio TEXT
 );
 
+CREATE TABLE refresh_tokens (
+    token_hash VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE chats (
     id VARCHAR(50) PRIMARY KEY,
     type chat_type_enum NOT NULL DEFAULT 'direct'
@@ -37,6 +43,9 @@ CREATE INDEX idx_users_username ON users(username);
 -- Fast lookups for chat queries
 CREATE INDEX idx_chat_participants_user_id ON chat_participants(user_id);
 CREATE INDEX idx_chat_messages_chat_id_created_at ON chat_messages(chat_id, created_at DESC);
+
+-- Fast lookup for when we verify or delete a token during refresh/logout
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 
 -- Some constraint on top of my head, we may implement more to ensure data quality
 CREATE OR REPLACE FUNCTION check_direct_chat_limit()

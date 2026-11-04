@@ -1,4 +1,5 @@
 Use bolt protocol in neo4j browser
+TODO: Update README with PSQL procedure
 
 # ErasMusic
 

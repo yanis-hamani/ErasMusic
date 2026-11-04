@@ -1,0 +1,77 @@
+services:
+
+  postgres:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/psql-init:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: mydatabase
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  neo4j:
+    image: neo4j:2026.09.0
+    volumes:
+      - neo4j_logs:/logs
+      - neo4j_conf:/conf
+      - neo4j_data:/data
+      - neo4j_plugins:/plugins
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD}"
+      DB_PASSWORD: "${NEO4J_PASSWORD}"
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$$DB_PASSWORD\" 'RETURN 1;' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+        - ./app:/app/app
+    environment:
+      # Neo4j settings
+      NEO4J_URI: "${NEO4J_URI}"
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: "${NEO4J_PASSWORD}"
+      NEO4J_DATABASE: neo4j
+      
+      # PostgreSQL settings
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: mydatabase
+      # Standard connection URI (adjust variable name to match what your API expects)
+      DATABASE_URL: postgresql://myuser:${POSTGRES_PASSWORD}@postgres:5432/mydatabase
+
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+# This tells Docker to manage the volumes and their permissions automatically
+volumes:
+  neo4j_logs:
+  neo4j_conf:
+  neo4j_data:
+  neo4j_plugins:
+  postgres_data:
