@@ -1,6 +1,14 @@
 Use bolt protocol in neo4j browser
 TODO: Update README with PSQL procedure
 
+
+docker compose --profile seed up
+docker compose up
+
+
+sudo chown -R $USER:$USER ./scripts/seeding
+sudo chmod -R 777 ./scripts/seeding
+
 # ErasMusic
 
 REST API built with **FastAPI** and **Neo4j**, running with Docker Compose.

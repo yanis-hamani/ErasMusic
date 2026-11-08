@@ -6,9 +6,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/psql-init:/docker-entrypoint-initdb.d
     environment:
-      POSTGRES_USER: myuser
+      POSTGRES_USER: myuser #TODO be in the .env !!
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-      POSTGRES_DB: mydatabase
+      POSTGRES_DB: mydatabase #TODO: ve in the .env
     ports:
       - "127.0.0.1:5432:5432"
     restart: unless-stopped
@@ -26,9 +26,11 @@ services:
       - neo4j_conf:/conf
       - neo4j_data:/data
       - neo4j_plugins:/plugins
+      - ./scripts/seeding:/import
     environment:
       NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD}"
       DB_PASSWORD: "${NEO4J_PASSWORD}"
+      NEO4J_dbms_usage__report_enabled: "false"
     ports:
       - "127.0.0.1:7474:7474"
       - "127.0.0.1:7687:7687"
@@ -39,6 +41,74 @@ services:
       timeout: 10s
       retries: 20
       start_period: 30s
+
+  neo4j-init:
+      image: neo4j:2026.09.0
+      depends_on:
+        neo4j:
+          condition: service_healthy
+      volumes:
+        - ./scripts/neo4j-init/0-constraint.cypher:/scripts/init.cypher:ro
+        - neo4j_data:/data  # Mount the persistent data volume here too
+      environment:
+        DB_PASSWORD: "${NEO4J_PASSWORD}"
+      command: >
+        sh -c "
+        if [ ! -f /data/.init_complete ]; then
+          echo 'Running initialization script...'
+          cypher-shell -a neo4j://neo4j:7687 -u neo4j -p \"$$DB_PASSWORD\" -f /scripts/init.cypher &&
+          touch /data/.init_complete
+          echo 'Initialization complete.'
+        else
+          echo 'Database already initialized. Skipping.'
+        fi
+        "
+
+  postgres-seed:
+    image: postgres:16
+    profiles: ["seed"] # Won't start on normal 'docker compose up'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./scripts/seeding:/scripts:ro
+      - postgres_data:/var/lib/postgresql/data # Mount data volume for the lock file
+    environment:
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+    command: >
+      sh -c "
+      if [ ! -f /var/lib/postgresql/data/.seeded ]; then
+        echo 'Seeding PostgreSQL...'
+        psql -h postgres -U myuser -d mydatabase -f /scripts/load-csv.sql &&
+        touch /var/lib/postgresql/data/.seeded
+        echo 'PostgreSQL seeding complete.'
+      else
+        echo 'PostgreSQL already seeded. Skipping.'
+      fi
+      "
+
+  neo4j-seed:
+    image: neo4j:2026.09.0
+    profiles: ["seed"] # Won't start on normal 'docker compose up'
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./scripts/seeding:/scripts:ro
+      - neo4j_data:/data # Mount data volume for the lock file
+    environment:
+      DB_PASSWORD: "${NEO4J_PASSWORD}"
+    command: >
+      sh -c "
+      if [ ! -f /data/.seeded ]; then
+        echo 'Seeding Neo4j...'
+        cypher-shell -a neo4j://neo4j:7687 -u neo4j -p \"$$DB_PASSWORD\" -f /scripts/load-csv.cypher &&
+        touch /data/.seeded
+        echo 'Neo4j seeding complete.'
+      else
+        echo 'Neo4j already seeded. Skipping.'
+      fi
+      "
 
   api:
     build:

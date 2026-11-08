@@ -1,17 +1,17 @@
+from app.core.di import AppProvider
+from dishka.integrations.fastapi import setup_dishka
+from dishka import make_async_container
 from fastapi import FastAPI
-from app.core.database import lifespan
-from app.api.v1.router import api_router
-from app.api.health import router as health_router
+from app.routers.auth import router as auth_router
+from app.routers.health import router as health_router
 
 app = FastAPI(
     title="ErasMusic API",
-    description="Neo4j & PostgreSQL API for ErasMusic",
     version="1.0.0",
-    lifespan=lifespan
 )
 
-# Root-level routes (like /health)
 app.include_router(health_router)
+app.include_router(auth_router)
 
-# Versioned API routes (like /v1/auth/register)
-app.include_router(api_router)
+container = make_async_container(AppProvider())
+setup_dishka(container, app)

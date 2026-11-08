@@ -135,25 +135,6 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /auth/me:
-    get:
-      tags:
-        - Authentication
-      summary: Get authenticated user's identity
-      description: >-
-        Returns core identity details of current authenticated user from
-        PostgreSQL.
-      responses:
-        '200':
-          description: User identity details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserIdentity'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
   /users/me:
     get:
       tags:

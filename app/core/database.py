@@ -1,8 +1,8 @@
+# app/database.py
 import os
 import asyncpg
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from neo4j import GraphDatabase
+from typing import AsyncGenerator
+from neo4j import AsyncGraphDatabase, AsyncDriver
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,22 +12,16 @@ NEO4J_USERNAME = os.environ["NEO4J_USERNAME"]
 NEO4J_PASSWORD = os.environ["NEO4J_PASSWORD"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initialize Neo4j Driver
-    neo4j_driver = GraphDatabase.driver(
+async def init_neo4j_driver() -> AsyncGenerator[AsyncDriver, None]:
+    driver = AsyncGraphDatabase.driver(
         NEO4J_URI,
         auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
     )
-    
-    # Initialize Postgres Connection Pool
-    pg_pool = await asyncpg.create_pool(DATABASE_URL)
+    await driver.verify_connectivity()
+    yield driver
+    await driver.close()
 
-    try:
-        neo4j_driver.verify_connectivity()
-        app.state.neo4j_driver = neo4j_driver
-        app.state.pg_pool = pg_pool
-        yield
-    finally:
-        neo4j_driver.close()
-        await pg_pool.close()
+async def init_pg_pool() -> AsyncGenerator[asyncpg.Pool, None]:
+    pool = await asyncpg.create_pool(DATABASE_URL)
+    yield pool
+    await pool.close()

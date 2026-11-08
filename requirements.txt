@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+dishka
 asyncpg
 neo4j
 pydantic
