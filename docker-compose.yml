@@ -54,14 +54,9 @@ services:
         DB_PASSWORD: "${NEO4J_PASSWORD}"
       command: >
         sh -c "
-        if [ ! -f /data/.init_complete ]; then
-          echo 'Running initialization script...'
-          cypher-shell -a neo4j://neo4j:7687 -u neo4j -p \"$$DB_PASSWORD\" -f /scripts/init.cypher &&
-          touch /data/.init_complete
-          echo 'Initialization complete.'
-        else
-          echo 'Database already initialized. Skipping.'
-        fi
+        echo 'Applying Neo4j constraints...' &&
+        cypher-shell -a neo4j://neo4j:7687 -u neo4j -p \"$$DB_PASSWORD\" -f /scripts/init.cypher &&
+        echo 'Neo4j constraints applied.'
         "
 
   postgres-seed:

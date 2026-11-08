@@ -271,7 +271,9 @@ paths:
       tags:
         - Friends & Social
       summary: List my friends
-      description: Retrieves friend list from Neo4j social graph.
+      description: >-
+        Retrieves friends from Neo4j. A friendship is stored as one
+        FRIENDS_WITH relationship and queried without direction.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Page'
@@ -294,6 +296,8 @@ paths:
                     $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -354,6 +358,10 @@ paths:
       tags:
         - Friends & Social
       summary: Send a friend request
+      description: >-
+        Creates a pending directed request. Requests to oneself, duplicate or
+        crossed requests, and requests between existing friends return a
+        conflict.
       requestBody:
         required: true
         content:
@@ -380,6 +388,7 @@ paths:
       tags:
         - Friends & Social
       summary: List incoming and outgoing requests
+      description: Returns pending requests ordered from newest to oldest.
       parameters:
         - name: direction
           in: query
@@ -390,17 +399,19 @@ paths:
               - outgoing
               - all
             default: all
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Page'
       responses:
         '200':
-          description: Friend requests list
+          description: Paginated friend requests list
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/FriendRequest'
+                $ref: '#/components/schemas/PaginatedFriendRequests'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -412,7 +423,7 @@ paths:
       summary: Accept a request
       description: >-
         Marks the request as accepted and creates the friendship relationship
-        in Neo4j.
+        in Neo4j. The processed request relationship is then deleted.
       parameters:
         - name: requestId
           in: path
@@ -441,6 +452,7 @@ paths:
       tags:
         - Friends & Social
       summary: Decline a request
+      description: Deletes the pending request after returning it with declined status.
       parameters:
         - name: requestId
           in: path
@@ -1987,6 +1999,19 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    PaginatedFriendRequests:
+      type: object
+      required:
+        - requests
+        - pagination
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/FriendRequest'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
 
     GroupTag:
       discriminator:
