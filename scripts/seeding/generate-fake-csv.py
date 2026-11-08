@@ -77,15 +77,19 @@ for _ in range(NUM_DIRECT_CHATS):
 groups = [] # For Neo4j Group nodes
 for _ in range(NUM_GROUP_CHATS):
     chat_id = f"chat_g_{uuid.uuid4().hex[:10]}"
+    group_id = f"grp_{uuid.uuid4().hex[:12]}"
     chats.append({'id': chat_id, 'type': 'group'})
-    
+
+    chat_users = random.sample(user_ids, random.randint(3, 10))
+    owner_id = chat_users[0]
     groups.append({
+        'id': group_id,
         'psqlChatId': chat_id,
+        'ownerId': owner_id,
         'name': fake.company() + " Fan Club",
         'description': fake.catch_phrase()
     })
-    
-    chat_users = random.sample(user_ids, random.randint(3, 10))
+
     chat_user_map[chat_id] = chat_users
     for uid in chat_users:
         participants.append({'chat_id': chat_id, 'user_id': uid})
@@ -138,7 +142,16 @@ song_genre_rels = [{'song_id': s['id'], 'genre_id': random.choice(genre_ids)} fo
 
 # Filter group chat participants specifically for Neo4j PARTS_OF
 group_chat_ids = [g['psqlChatId'] for g in groups]
-parts_of_rels = [p for p in participants if p['chat_id'] in group_chat_ids]
+group_owners = {g['psqlChatId']: g['ownerId'] for g in groups}
+parts_of_rels = [
+    {
+        **p,
+        'role': 'owner' if p['user_id'] == group_owners[p['chat_id']] else 'member',
+        'joined_at': datetime.now().isoformat(),
+    }
+    for p in participants
+    if p['chat_id'] in group_chat_ids
+]
 
 # ==========================================
 # 3. WRITE TO FILES
@@ -152,7 +165,7 @@ write_csv('psql_chat_messages.csv', messages, ['id', 'chat_id', 'sender_id', 'me
 
 # Neo4j Nodes
 write_csv('neo4j_users.csv', [{'psqlId': u['id'], 'username': u['username']} for u in users], ['psqlId', 'username'])
-write_csv('neo4j_groups.csv', groups, ['psqlChatId', 'name', 'description'])
+write_csv('neo4j_groups.csv', groups, ['id', 'psqlChatId', 'ownerId', 'name', 'description'])
 write_csv('neo4j_artists.csv', artists, ['id', 'name', 'profilePicture', 'spotifyURL'])
 write_csv('neo4j_songs.csv', songs, ['id', 'title', 'coverURL', 'spotifyURL'])
 write_csv('neo4j_genres.csv', genres, ['id', 'name'])
@@ -162,6 +175,6 @@ write_csv('neo4j_rel_friends.csv', friends_rels, ['from', 'to', 'closeness'])
 write_csv('neo4j_rel_listen.csv', listen_rels, ['user_id', 'song_id', 'short', 'medium', 'long'])
 write_csv('neo4j_rel_song_artist.csv', song_artist_rels, ['song_id', 'artist_id'])
 write_csv('neo4j_rel_song_genre.csv', song_genre_rels, ['song_id', 'genre_id'])
-write_csv('neo4j_rel_parts_of.csv', parts_of_rels, ['chat_id', 'user_id'])
+write_csv('neo4j_rel_parts_of.csv', parts_of_rels, ['chat_id', 'user_id', 'role', 'joined_at'])
 
 print("Successfully generated all CSVs!")

@@ -6,6 +6,9 @@ from app.services.auth_services import AuthService
 from app.services.user_services import UserService
 from app.services.friend_services import FriendService
 from app.repositories.friend_neo_repository import FriendNeoRepository
+from app.repositories.group_neo_repository import GroupNeoRepository
+from app.repositories.chat_psql_repository import ChatPsqlRepository
+from app.services.group_services import GroupService
 from app.repositories.user_neo_repository import UserNeoRepository
 from dishka import Provider, Scope, provide
 
@@ -19,7 +22,10 @@ class AppProvider(Provider):
     register_hashed_repo = provide(RegisterHashedRepository, scope=Scope.REQUEST)
     user_psql_repo = provide(UserPsqlRepository, scope=Scope.REQUEST)
     friend_neo_repo = provide(FriendNeoRepository, scope=Scope.REQUEST)
+    group_neo_repo = provide(GroupNeoRepository, scope=Scope.REQUEST)
+    chat_psql_repo = provide(ChatPsqlRepository, scope=Scope.REQUEST)
 
     auth_service = provide(AuthService, scope=Scope.REQUEST)
     user_service = provide(UserService, scope=Scope.REQUEST)
     friend_service = provide(FriendService, scope=Scope.REQUEST)
+    group_service = provide(GroupService, scope=Scope.REQUEST)

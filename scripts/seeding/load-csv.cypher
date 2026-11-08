@@ -8,7 +8,13 @@ CREATE (:User {psqlId: row.psqlId, username: row.username});
 
 // Import Groups
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_groups.csv' AS row
-CREATE (:Group {psqlChatId: row.psqlChatId, name: row.name, description: row.description});
+CREATE (:Group {
+    id: coalesce(row.id, 'grp_' + replace(row.psqlChatId, 'chat_', '')),
+    psqlChatId: row.psqlChatId,
+    ownerId: row.ownerId,
+    name: row.name,
+    description: row.description
+});
 
 // Import Artists
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_artists.csv' AS row
@@ -61,4 +67,19 @@ CREATE (s)-[:RELATED_TO]->(g);
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_rel_parts_of.csv' AS row
 MATCH (u:User {psqlId: row.user_id})
 MATCH (grp:Group {psqlChatId: row.chat_id})
-CREATE (u)-[:PARTS_OF]->(grp);
+CREATE (u)-[:PARTS_OF {
+    role: coalesce(row.role, 'member'),
+    joinedAt: CASE
+        WHEN row.joined_at IS NULL THEN datetime()
+        ELSE datetime(row.joined_at)
+    END
+}]->(grp);
+
+// Backfill ownership for legacy seed CSVs that do not contain owner metadata.
+MATCH (user:User)-[membership:PARTS_OF]->(group:Group)
+WITH group, user, membership
+ORDER BY user.psqlId
+WITH group, collect(user)[0] AS owner, collect(membership)[0] AS ownerMembership
+WHERE group.ownerId IS NULL
+SET group.ownerId = owner.psqlId,
+    ownerMembership.role = 'owner';

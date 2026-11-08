@@ -6,6 +6,7 @@ from app.routers.auth import router as auth_router
 from app.routers.health import router as health_router
 from app.routers.users import router as users_router
 from app.routers.friends import router as friends_router
+from app.routers.groups import router as groups_router
 
 app = FastAPI(
     title="ErasMusic API",
@@ -16,6 +17,7 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(friends_router)
+app.include_router(groups_router)
 
 container = make_async_container(AppProvider())
 setup_dishka(container, app)

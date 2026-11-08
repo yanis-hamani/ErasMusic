@@ -480,6 +480,7 @@ paths:
       tags:
         - Groups
       summary: Discover or list groups
+      description: Lists all groups available to authenticated users.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Page'
@@ -499,6 +500,7 @@ paths:
       tags:
         - Groups
       summary: Create a group
+      description: Creates a group, its linked PostgreSQL chat, and an owner membership.
       requestBody:
         required: true
         content:
@@ -514,6 +516,8 @@ paths:
                 $ref: '#/components/schemas/Group'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
@@ -541,8 +545,6 @@ paths:
                 $ref: '#/components/schemas/Group'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -618,11 +620,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedUsers'
+                $ref: '#/components/schemas/PaginatedGroupMembers'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
@@ -632,6 +632,9 @@ paths:
       tags:
         - Groups
       summary: Join a group or add a member
+      description: >-
+        With no userId, the authenticated user joins the group. Adding another
+        user is restricted to the group owner.
       parameters:
         - name: groupId
           in: path
@@ -642,20 +645,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                userId:
-                  type: string
-                  description: >-
-                    Optional target user ID (admin action); defaults to current
-                    user.
+              $ref: '#/components/schemas/GroupMemberCreate'
       responses:
         '201':
           description: Group membership created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/GroupMember'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -673,6 +670,7 @@ paths:
       tags:
         - Groups
       summary: Leave a group
+      description: Members may leave; the owner must delete the group instead.
       parameters:
         - name: groupId
           in: path
@@ -715,13 +713,13 @@ paths:
                   artistId: artist_1
                   name: Arctic Monkeys
                 - type: genre
+                  genreId: genre_1
                   name: indie
                 - type: genre
+                  genreId: genre_2
                   name: alternative
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -740,23 +738,13 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - tags
-              properties:
-                tags:
-                  type: array
-                  maxItems: 10
-                  uniqueItems: true
-                  items:
-                    $ref: '#/components/schemas/GroupTag'
+              $ref: '#/components/schemas/GroupTagsReplace'
             example:
               tags:
                 - type: artist
                   artistId: artist_1
-                  name: Arctic Monkeys
                 - type: genre
-                  name: indie
+                  genreId: genre_1
       responses:
         '200':
           description: Tags updated
@@ -2023,6 +2011,46 @@ components:
         - $ref: '#/components/schemas/ArtistGroupTag'
         - $ref: '#/components/schemas/GenreGroupTag'
 
+    GroupTagInput:
+      discriminator:
+        propertyName: type
+        mapping:
+          artist: '#/components/schemas/ArtistGroupTagInput'
+          genre: '#/components/schemas/GenreGroupTagInput'
+      oneOf:
+        - $ref: '#/components/schemas/ArtistGroupTagInput'
+        - $ref: '#/components/schemas/GenreGroupTagInput'
+
+    ArtistGroupTagInput:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - artistId
+      properties:
+        type:
+          type: string
+          enum:
+            - artist
+        artistId:
+          type: string
+          example: artist_1
+
+    GenreGroupTagInput:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - genreId
+      properties:
+        type:
+          type: string
+          enum:
+            - genre
+        genreId:
+          type: string
+          example: genre_1
+
     ArtistGroupTag:
       type: object
       title: Artist tag
@@ -2049,12 +2077,17 @@ components:
       title: Genre tag
       required:
         - type
+        - genreId
         - name
       properties:
         type:
           type: string
           enum:
             - genre
+        genreId:
+          type: string
+          description: ID of the genre in the music catalog
+          example: genre_1
         name:
           type: string
           description: Genre name
@@ -2064,6 +2097,7 @@ components:
       type: object
       required:
         - id
+        - ownerId
         - name
         - description
         - tags
@@ -2071,6 +2105,9 @@ components:
         id:
           type: string
           example: grp_123
+        ownerId:
+          type: string
+          example: usr_a1b2c3d4e5f6
         name:
           type: string
           example: Indie Music Lovers
@@ -2103,7 +2140,7 @@ components:
           maxItems: 10
           uniqueItems: true
           items:
-            $ref: '#/components/schemas/GroupTag'
+            $ref: '#/components/schemas/GroupTagInput'
 
     GroupUpdate:
       type: object
@@ -2115,6 +2152,62 @@ components:
         description:
           type: string
           minLength: 1
+
+    GroupTagsReplace:
+      type: object
+      required:
+        - tags
+      properties:
+        tags:
+          type: array
+          maxItems: 10
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/GroupTagInput'
+
+    GroupMemberCreate:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: Optional target user; defaults to the authenticated user
+          example: usr_a1b2c3d4e5f6
+
+    GroupMember:
+      type: object
+      required:
+        - id
+        - username
+        - role
+        - joinedAt
+      properties:
+        id:
+          type: string
+          example: usr_a1b2c3d4e5f6
+        username:
+          type: string
+          example: alex
+        role:
+          type: string
+          enum:
+            - owner
+            - member
+        joinedAt:
+          type: string
+          format: date-time
+
+    PaginatedGroupMembers:
+      type: object
+      required:
+        - members
+        - pagination
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupMember'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
 
     Artist:
       type: object
