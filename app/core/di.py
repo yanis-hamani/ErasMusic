@@ -3,6 +3,7 @@ from app.repositories.register_hashed_repository import RegisterHashedRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.core.database import init_pg_pool, init_neo4j_driver
 from app.services.auth_services import AuthService
+from app.services.user_services import UserService
 from app.repositories.user_neo_repository import UserNeoRepository
 from dishka import Provider, Scope, provide
 
@@ -17,4 +18,4 @@ class AppProvider(Provider):
     user_psql_repo = provide(UserPsqlRepository, scope=Scope.REQUEST)
 
     auth_service = provide(AuthService, scope=Scope.REQUEST)
-
+    user_service = provide(UserService, scope=Scope.REQUEST)

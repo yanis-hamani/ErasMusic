@@ -1,17 +1,13 @@
-from asyncpg import Pool
-from dishka import FromDishka
-from fastapi import Request, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 
-from typing import Type, TypeVar
-from app.models.auth import UserIdentity
 from app.core.security import decode_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
+bearer_scheme = HTTPBearer(auto_error=False, scheme_name="BearerAuth")
 
 async def verify_access_token(
-    token: str = Depends(oauth2_scheme)
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> str:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -19,7 +15,11 @@ async def verify_access_token(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise credentials_exception
+
     try:
+        token = credentials.credentials
         payload = decode_token(token)
         user_id: str = payload.get("sub")
         token_type: str = payload.get("type")
@@ -37,4 +37,3 @@ async def verify_access_token(
         )
     except jwt.InvalidTokenError:
         raise credentials_exception
-
