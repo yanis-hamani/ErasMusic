@@ -8,6 +8,7 @@ from app.routers.users import router as users_router
 from app.routers.friends import router as friends_router
 from app.routers.groups import router as groups_router
 from app.routers.search import router as search_router
+from app.routers.music import router as music_router
 
 app = FastAPI(
     title="ErasMusic API",
@@ -20,6 +21,7 @@ app.include_router(users_router)
 app.include_router(friends_router)
 app.include_router(groups_router)
 app.include_router(search_router)
+app.include_router(music_router)
 
 container = make_async_container(AppProvider())
 setup_dishka(container, app)

@@ -770,6 +770,7 @@ paths:
       tags:
         - Music Data
       summary: Browse or list artists
+      description: Artists are ordered alphabetically by name and then by ID.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Page'
@@ -779,17 +780,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - artists
-                  - pagination
-                properties: 
-                  artists:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Artist'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/PaginatedArtists'
 
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -827,6 +818,9 @@ paths:
       tags:
         - Music Data
       summary: Browse or list songs
+      description: >-
+        Songs are ordered alphabetically by title and then by ID. Songs without
+        a performing artist remain visible with an empty artists array.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Page'
@@ -836,17 +830,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - songs
-                  - pagination
-                properties: 
-                  songs:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Song'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/PaginatedSongs'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
@@ -883,6 +867,7 @@ paths:
       tags:
         - Music Data
       summary: Browse genres
+      description: Genres are ordered alphabetically by name and then by ID.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Page'
@@ -892,17 +877,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - genres
-                  - pagination
-                properties: 
-                  genres:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Genre'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/PaginatedGenres'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
@@ -2222,6 +2197,45 @@ components:
         pagination:
           $ref: '#/components/schemas/Pagination'
 
+    PaginatedArtists:
+      type: object
+      required:
+        - artists
+        - pagination
+      properties:
+        artists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artist'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    PaginatedSongs:
+      type: object
+      required:
+        - songs
+        - pagination
+      properties:
+        songs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Song'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    PaginatedGenres:
+      type: object
+      required:
+        - genres
+        - pagination
+      properties:
+        genres:
+          type: array
+          items:
+            $ref: '#/components/schemas/Genre'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
     Artist:
       type: object
       required:
@@ -2270,6 +2284,7 @@ components:
           example: https://open.spotify.com/track/example
         artists:
           type: array
+          description: Performing artists, or an empty array when none are linked
           items:
             $ref: '#/components/schemas/Artist'
 
@@ -2281,8 +2296,7 @@ components:
       properties:
         id:
           type: string
-          format: uuid
-          example: 550e8400-e29b-41d4-a716-446655440000
+          example: genre_1
         name:
           type: string
           example: Indie Rock
