@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.models.search import SearchUser
 from app.models.users import UserRecord
 
 class UserPsqlRepository:
@@ -23,6 +24,59 @@ class UserPsqlRepository:
             user_id,
         )
         return self._to_user(record)
+
+    async def count_search_users(
+        self,
+        psql_conn,
+        current_user_id: str,
+        query: str,
+    ) -> int:
+        return int(
+            await psql_conn.fetchval(
+                """
+                SELECT count(*)
+                FROM users
+                WHERE id <> $1
+                  AND strpos(lower(username), $2) > 0
+                """,
+                current_user_id,
+                query,
+            )
+        )
+
+    async def search_users(
+        self,
+        psql_conn,
+        current_user_id: str,
+        query: str,
+        skip: int,
+        limit: int,
+    ) -> list[SearchUser]:
+        records = await psql_conn.fetch(
+            """
+            SELECT id, username
+            FROM users
+            WHERE id <> $1
+              AND strpos(lower(username), $2) > 0
+            ORDER BY CASE
+                         WHEN lower(username) = $2 THEN 0
+                         WHEN strpos(lower(username), $2) = 1 THEN 1
+                         ELSE 2
+                     END,
+                     lower(username),
+                     id
+            OFFSET $3
+            LIMIT $4
+            """,
+            current_user_id,
+            query,
+            skip,
+            limit,
+        )
+        return [
+            SearchUser(id=record["id"], username=record["username"])
+            for record in records
+        ]
 
     async def update_profile(
         self,

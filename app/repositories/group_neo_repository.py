@@ -48,6 +48,81 @@ class GroupNeoRepository:
         return [GroupNeoRepository._group_record(record) async for record in result]
 
     @staticmethod
+    async def count_search_groups(transaction, query: str) -> int:
+        result = await transaction.run(
+            """
+            MATCH (group:Group)
+            WHERE group.id IS NOT NULL
+            OPTIONAL MATCH (group)-[:TAGGED_WITH]->(tag)
+            WITH group,
+                 collect(DISTINCT toLower(tag.name)) AS tagNames,
+                 toLower($search_query) AS query
+            WITH group,
+                 tagNames,
+                 query,
+                 toLower(group.name) AS groupName,
+                 coalesce(toLower(group.description), '') AS groupDescription
+            WHERE groupName CONTAINS query
+               OR groupDescription CONTAINS query
+               OR any(tagName IN tagNames WHERE tagName CONTAINS query)
+            RETURN count(group) AS total
+            """,
+            search_query=query,
+        )
+        record = await result.single()
+        return int(record["total"]) if record else 0
+
+    @staticmethod
+    async def search_group_records(
+        transaction,
+        query: str,
+        skip: int,
+        limit: int,
+    ) -> list[GroupRecord]:
+        result = await transaction.run(
+            """
+            MATCH (group:Group)
+            WHERE group.id IS NOT NULL
+            OPTIONAL MATCH (group)-[:TAGGED_WITH]->(tag)
+            WITH group,
+                 collect(DISTINCT toLower(tag.name)) AS tagNames,
+                 toLower($search_query) AS query
+            WITH group,
+                 tagNames,
+                 query,
+                 toLower(group.name) AS groupName,
+                 coalesce(toLower(group.description), '') AS groupDescription
+            WHERE groupName CONTAINS query
+               OR groupDescription CONTAINS query
+               OR any(tagName IN tagNames WHERE tagName CONTAINS query)
+            WITH group,
+                 CASE
+                     WHEN groupName = query
+                       OR groupDescription = query
+                       OR any(tagName IN tagNames WHERE tagName = query)
+                         THEN 0
+                     WHEN groupName STARTS WITH query
+                       OR groupDescription STARTS WITH query
+                       OR any(tagName IN tagNames WHERE tagName STARTS WITH query)
+                         THEN 1
+                     ELSE 2
+                 END AS relevance
+            RETURN group.id AS id,
+                   group.psqlChatId AS psqlChatId,
+                   group.ownerId AS ownerId,
+                   group.name AS name,
+                   group.description AS description
+            ORDER BY relevance, toLower(group.name), group.id
+            SKIP $skip
+            LIMIT $limit
+            """,
+            search_query=query,
+            skip=skip,
+            limit=limit,
+        )
+        return [GroupNeoRepository._group_record(record) async for record in result]
+
+    @staticmethod
     async def select_group(transaction, group_id: str) -> GroupRecord | None:
         result = await transaction.run(
             """

@@ -1274,6 +1274,11 @@ paths:
       tags:
         - Search
       summary: Search people
+      description: >-
+        Searches usernames using case-insensitive literal substring matching.
+        The authenticated user is excluded. Exact matches are returned first,
+        followed by prefix and substring matches, with deterministic
+        alphabetical ordering within each relevance level.
       parameters:
         - $ref: '#/components/parameters/SearchQuery'
         - $ref: '#/components/parameters/Limit'
@@ -1296,6 +1301,11 @@ paths:
       tags:
         - Search
       summary: Search groups
+      description: >-
+        Searches group names, descriptions, artist tags, and genre tags using
+        case-insensitive literal substring matching. Exact matches are returned
+        first, followed by prefix and substring matches, with deterministic
+        alphabetical ordering within each relevance level.
       parameters:
         - $ref: '#/components/parameters/SearchQuery'
         - $ref: '#/components/parameters/Limit'
@@ -1598,11 +1608,14 @@ components:
     SearchQuery:
       name: q
       in: query
-      description: Search term
+      description: >-
+        Non-blank search term. Leading and trailing whitespace is ignored, and
+        wildcard characters such as % and _ are matched literally.
       required: true
       schema:
         type: string
         minLength: 1
+        pattern: '\S'
     RefreshTokenCookie:
       name: refresh_token
       in: cookie
