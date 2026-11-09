@@ -39,7 +39,9 @@ CREATE (:Genre {id: row.id, name: row.name});
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_rel_friends.csv' AS row
 MATCH (u1:User {psqlId: row.from})
 MATCH (u2:User {psqlId: row.to})
-CREATE (u1)-[:FRIENDS_WITH {closeness: toFloat(row.closeness)}]->(u2);
+MERGE (u1)-[friendship:FRIENDS_WITH]-(u2)
+ON CREATE SET friendship.closeness = toFloat(row.closeness),
+              friendship.closenessUpdatedAt = datetime();
 
 // Listen To (User -> Song)
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_rel_listen.csv' AS row

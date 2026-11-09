@@ -17,7 +17,9 @@ CREATE TABLE refresh_tokens (
 
 CREATE TABLE chats (
     id VARCHAR(50) PRIMARY KEY,
-    type chat_type_enum NOT NULL DEFAULT 'direct'
+    type chat_type_enum NOT NULL DEFAULT 'direct',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_closeness_activity_date DATE
 );
 
 -- TODO: Constraint to prevent user chat to have more other than two participant
@@ -42,7 +44,7 @@ CREATE INDEX idx_users_username ON users(username);
 
 -- Fast lookups for chat queries
 CREATE INDEX idx_chat_participants_user_id ON chat_participants(user_id);
-CREATE INDEX idx_chat_messages_chat_id_created_at ON chat_messages(chat_id, created_at DESC);
+CREATE INDEX idx_chat_messages_chat_id_created_at ON chat_messages(chat_id, created_at DESC, id DESC);
 
 -- Fast lookup for when we verify or delete a token during refresh/logout
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
@@ -96,6 +98,35 @@ EXECUTE FUNCTION check_direct_chat_limit();
 ALTER TABLE chat_messages 
 ADD CONSTRAINT check_message_not_empty 
 CHECK (TRIM(message) <> '');
+
+ALTER TABLE chat_messages
+ADD CONSTRAINT check_message_length
+CHECK (char_length(message) <= 4000);
+
+CREATE OR REPLACE FUNCTION delete_invalid_chat_after_participant_removal()
+RETURNS TRIGGER AS $$
+DECLARE
+    c_type chat_type_enum;
+    participant_count INT;
+BEGIN
+    SELECT type INTO c_type FROM chats WHERE id = OLD.chat_id;
+    SELECT COUNT(*) INTO participant_count
+    FROM chat_participants
+    WHERE chat_id = OLD.chat_id;
+
+    IF participant_count = 0
+       OR (c_type = 'direct' AND participant_count < 2) THEN
+        DELETE FROM chats WHERE id = OLD.chat_id;
+    END IF;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cleanup_incomplete_direct_chat
+AFTER DELETE ON chat_participants
+FOR EACH ROW
+EXECUTE FUNCTION delete_invalid_chat_after_participant_removal();
 
 ALTER TABLE users 
 ADD CONSTRAINT check_username_length 

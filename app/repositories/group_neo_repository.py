@@ -11,6 +11,18 @@ from app.models.groups import (
 
 class GroupNeoRepository:
     @staticmethod
+    async def group_chat_exists(transaction, chat_id: str) -> bool:
+        result = await transaction.run(
+            """
+            MATCH (group:Group {psqlChatId: $chat_id})
+            RETURN count(group) > 0 AS exists
+            """,
+            chat_id=chat_id,
+        )
+        record = await result.single()
+        return bool(record and record["exists"])
+
+    @staticmethod
     async def user_exists(transaction, user_id: str) -> bool:
         result = await transaction.run(
             "MATCH (u:User {psqlId: $user_id}) RETURN count(u) = 1 AS exists",

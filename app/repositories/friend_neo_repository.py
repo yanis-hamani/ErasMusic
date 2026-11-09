@@ -250,12 +250,91 @@ class FriendNeoRepository:
             MATCH (second:User {psqlId: $second_user_id})
             WITH CASE WHEN first.psqlId < second.psqlId THEN first ELSE second END AS left,
                  CASE WHEN first.psqlId < second.psqlId THEN second ELSE first END AS right
-            CREATE (left)-[:FRIENDS_WITH {closeness: 0}]->(right)
+            CREATE (left)-[:FRIENDS_WITH {
+                closeness: 0.0,
+                closenessUpdatedAt: datetime()
+            }]->(right)
             """,
             first_user_id=first_user_id,
             second_user_id=second_user_id,
         )
         await result.consume()
+
+    @staticmethod
+    async def increase_closeness(
+        transaction,
+        first_user_id: str,
+        second_user_id: str,
+        interaction_at: datetime,
+    ) -> bool:
+        result = await transaction.run(
+            """
+            MATCH (:User {psqlId: $first_user_id})
+                  -[friendship:FRIENDS_WITH]-
+                  (:User {psqlId: $second_user_id})
+            WITH friendship, $interaction_at AS interactionAt
+            WITH friendship,
+                 interactionAt,
+                 CASE
+                     WHEN friendship.closenessUpdatedAt IS NULL THEN 0.0
+                     ELSE toFloat(
+                         interactionAt.epochSeconds
+                         - friendship.closenessUpdatedAt.epochSeconds
+                     ) / 2592000.0
+                 END AS elapsedHalfLives
+            WITH friendship,
+                 interactionAt,
+                 coalesce(friendship.closeness, 0.0)
+                 * (2.0 ^ (0.0 - CASE
+                     WHEN elapsedHalfLives < 0.0 THEN 0.0
+                     ELSE elapsedHalfLives
+                 END)) AS decayedCloseness
+            SET friendship.closeness = CASE
+                    WHEN decayedCloseness + 0.10 > 1.0 THEN 1.0
+                    ELSE decayedCloseness + 0.10
+                END,
+                friendship.closenessUpdatedAt = interactionAt
+            RETURN friendship.closeness AS closeness
+            """,
+            first_user_id=first_user_id,
+            second_user_id=second_user_id,
+            interaction_at=interaction_at,
+        )
+        return await result.single() is not None
+
+    @staticmethod
+    async def effective_closeness(
+        transaction,
+        first_user_id: str,
+        second_user_id: str,
+        as_of: datetime,
+    ) -> float | None:
+        result = await transaction.run(
+            """
+            MATCH (:User {psqlId: $first_user_id})
+                  -[friendship:FRIENDS_WITH]-
+                  (:User {psqlId: $second_user_id})
+            WITH friendship, $as_of AS asOf
+            WITH friendship,
+                 CASE
+                     WHEN friendship.closenessUpdatedAt IS NULL THEN 0.0
+                     ELSE toFloat(
+                         asOf.epochSeconds
+                         - friendship.closenessUpdatedAt.epochSeconds
+                     ) / 2592000.0
+                 END AS elapsedHalfLives
+            RETURN coalesce(friendship.closeness, 0.0)
+                   * (2.0 ^ (0.0 - CASE
+                       WHEN elapsedHalfLives < 0.0 THEN 0.0
+                       ELSE elapsedHalfLives
+                   END)) AS closeness
+            """,
+            first_user_id=first_user_id,
+            second_user_id=second_user_id,
+            as_of=as_of,
+        )
+        record = await result.single()
+        return float(record["closeness"]) if record else None
 
     @staticmethod
     async def delete_request(transaction, request_id: str) -> bool:

@@ -12,6 +12,7 @@ from app.services.group_services import GroupService
 from app.services.search_services import SearchService
 from app.repositories.music_neo_repository import MusicNeoRepository
 from app.services.music_services import MusicService
+from app.services.chat_services import ChatService
 from app.repositories.user_neo_repository import UserNeoRepository
 from dishka import Provider, Scope, provide
 
@@ -35,3 +36,4 @@ class AppProvider(Provider):
     group_service = provide(GroupService, scope=Scope.REQUEST)
     search_service = provide(SearchService, scope=Scope.REQUEST)
     music_service = provide(MusicService, scope=Scope.REQUEST)
+    chat_service = provide(ChatService, scope=Scope.REQUEST)
