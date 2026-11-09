@@ -915,7 +915,13 @@ paths:
       tags:
         - Recommendations
       summary: Recommend users based on artists you listen to
-      description: Returns users who have also listened to artists you listened to during the selected time period, grouped by artist. Each artist can have up to 20 recommended users.
+      description: >-
+        Returns users who have also listened to artists you listened to during
+        the selected time period, grouped by artist. Artist groups are ordered
+        by your summed period score, and users within each group are ordered by
+        their summed score for that artist. The authenticated user, existing
+        friends, and zero-score activity are excluded. Each artist can have up
+        to 20 recommended users.
       parameters:
         - $ref: '#/components/parameters/Period'
         - name: limit
@@ -969,7 +975,12 @@ paths:
       tags:
         - Recommendations
       summary: Recommend users based on songs you listen to
-      description: Returns users who listened to the same songs during the selected time period, grouped by song. Each song can have up to 20 recommended users.
+      description: >-
+        Returns users who listened to the same songs during the selected time
+        period, grouped by song. Song groups are ordered by your period score,
+        and users within each group are ordered by their score for that song.
+        The authenticated user, existing friends, and zero-score activity are
+        excluded. Each song can have up to 20 recommended users.
       parameters:
         - $ref: '#/components/parameters/Period'
         - name: limit
@@ -1026,8 +1037,11 @@ paths:
       description: >-
         Returns users who are not yet your friends but share at least one mutual
         friend with you. Recommendations are grouped by mutual friend and
-        prioritized based on how close you are to each mutual friend. Each mutual
-        friend can have up to 20 recommended users.
+        prioritized using lazily decayed friendship closeness. Mutual-friend
+        groups are ordered by your effective closeness to that friend. Users
+        within each group are ordered by the product of both effective closeness
+        values along the two-edge path. A user may appear under multiple mutual
+        friends. Each mutual friend can have up to 20 recommended users.
       parameters:
         - name: limit
           in: query
@@ -1087,7 +1101,12 @@ paths:
       tags:
         - Recommendations
       summary: Recommend groups based on artists you listen to
-      description: Returns groups related to artists you listened to during the selected time period, grouped by artist and ordered by affinity. Each artist can have up to 20 recommended groups.
+      description: >-
+        Returns groups tagged with artists you listened to during the selected
+        time period. Artist groups are ordered by your summed period score.
+        Groups you already joined and zero-score activity are excluded. Groups
+        within each artist are ordered by name and ID, with at most 20 groups
+        per artist.
       parameters:
         - $ref: '#/components/parameters/Period'
         - name: limit
@@ -1141,7 +1160,12 @@ paths:
       tags:
         - Recommendations
       summary: Recommend groups based on genres you listen to
-      description: Returns groups about genres you've listened to during the selected time period, grouped by genre. Each genre can have up to 20 recommended groups.
+      description: >-
+        Returns groups tagged with genres related to songs you listened to
+        during the selected time period. Genre groups are ordered by your summed
+        period score. Groups you already joined and zero-score activity are
+        excluded. Groups within each genre are ordered by name and ID, with at
+        most 20 groups per genre.
       parameters:
         - $ref: '#/components/parameters/Period'
         - name: limit
@@ -1197,8 +1221,10 @@ paths:
       summary: Recommend groups through your closest friends
       description: >-
         Returns groups that include your friends but that you have not joined.
-        Recommendations are grouped by friend and prioritized by relationship
-        closeness. Each friend can have up to 20 recommended groups.
+        Recommendations are grouped by friend and ordered by lazily decayed
+        effective relationship closeness. Groups within each friend are ordered
+        by name and ID. A group may appear under multiple friends, and each
+        friend can have up to 20 recommended groups.
       parameters:
         - name: limit
           in: query
@@ -1710,6 +1736,7 @@ components:
         limit:
           type: integer
           minimum: 1
+          maximum: 100
           description: Maximum number of items per page
           example: 20
         totalItems:

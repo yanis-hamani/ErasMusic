@@ -13,6 +13,8 @@ from app.services.search_services import SearchService
 from app.repositories.music_neo_repository import MusicNeoRepository
 from app.services.music_services import MusicService
 from app.services.chat_services import ChatService
+from app.repositories.recommendation_neo_repository import RecommendationNeoRepository
+from app.services.recommendation_services import RecommendationService
 from app.repositories.user_neo_repository import UserNeoRepository
 from dishka import Provider, Scope, provide
 
@@ -29,6 +31,10 @@ class AppProvider(Provider):
     group_neo_repo = provide(GroupNeoRepository, scope=Scope.REQUEST)
     chat_psql_repo = provide(ChatPsqlRepository, scope=Scope.REQUEST)
     music_neo_repo = provide(MusicNeoRepository, scope=Scope.REQUEST)
+    recommendation_neo_repo = provide(
+        RecommendationNeoRepository,
+        scope=Scope.REQUEST,
+    )
 
     auth_service = provide(AuthService, scope=Scope.REQUEST)
     user_service = provide(UserService, scope=Scope.REQUEST)
@@ -37,3 +43,4 @@ class AppProvider(Provider):
     search_service = provide(SearchService, scope=Scope.REQUEST)
     music_service = provide(MusicService, scope=Scope.REQUEST)
     chat_service = provide(ChatService, scope=Scope.REQUEST)
+    recommendation_service = provide(RecommendationService, scope=Scope.REQUEST)
