@@ -15,6 +15,12 @@ ErasMusic is a social media platform that lets you meet new people through share
 
 2. Choose one startup mode.
 
+   **Start with empty databases:**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
    **Start with sample data** (recommended when exploring the API):
 
    ```bash
@@ -30,12 +36,6 @@ ErasMusic is a social media platform that lets you meet new people through share
    - Username: `demo`
    - Email: `demo@example.com`
    - Password: `StrongPassword123`
-
-   **Start with empty databases:**
-
-   ```bash
-   docker compose up -d --build
-   ```
 
 4. Verify the API and both databases:
 
