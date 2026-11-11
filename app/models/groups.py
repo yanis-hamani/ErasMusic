@@ -16,14 +16,14 @@ class ArtistGroupTagInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["artist"]
-    artistId: str = Field(..., min_length=1)
+    artistId: str = Field(..., min_length=1, example="artist_1")
 
 
 class GenreGroupTagInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["genre"]
-    genreId: str = Field(..., min_length=1)
+    genreId: str = Field(..., min_length=1, example="genre_1")
 
 
 GroupTagInput = Annotated[
@@ -33,11 +33,27 @@ GroupTagInput = Annotated[
 
 
 class ArtistGroupTag(ArtistGroupTagInput):
-    name: str
+    model_config = ConfigDict(title="Artist tag")
+
+    artistId: str = Field(
+        ...,
+        min_length=1,
+        description="ID of the artist in the music catalog",
+        example="artist_1",
+    )
+    name: str = Field(..., description="Artist name", example="Arctic Monkeys")
 
 
 class GenreGroupTag(GenreGroupTagInput):
-    name: str
+    model_config = ConfigDict(title="Genre tag")
+
+    genreId: str = Field(
+        ...,
+        min_length=1,
+        description="ID of the genre in the music catalog",
+        example="genre_1",
+    )
+    name: str = Field(..., description="Genre name", example="indie")
 
 
 GroupTag = Annotated[ArtistGroupTag | GenreGroupTag, Field(discriminator="type")]
@@ -54,9 +70,17 @@ def _validate_unique_tags(tags: list[GroupTagInput]) -> list[GroupTagInput]:
 
 
 class GroupCreate(BaseModel):
-    name: str = Field(..., min_length=1)
-    description: str = Field(..., min_length=1)
-    tags: list[GroupTagInput] = Field(default_factory=list, max_length=10)
+    name: str = Field(..., min_length=1, example="Indie Music Lovers")
+    description: str = Field(
+        ...,
+        min_length=1,
+        example="Discover and discuss indie music",
+    )
+    tags: list[GroupTagInput] = Field(
+        default_factory=list,
+        max_length=10,
+        json_schema_extra={"uniqueItems": True},
+    )
 
     @field_validator("name", "description")
     @classmethod
@@ -73,8 +97,10 @@ class GroupCreate(BaseModel):
 
 
 class GroupUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    model_config = ConfigDict(json_schema_extra={"minProperties": 1})
+
+    name: str | None = Field(default=None, min_length=1)
+    description: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_update(self) -> "GroupUpdate":
@@ -89,7 +115,11 @@ class GroupUpdate(BaseModel):
 
 
 class GroupTagsReplace(BaseModel):
-    tags: list[GroupTagInput] = Field(..., max_length=10)
+    tags: list[GroupTagInput] = Field(
+        ...,
+        max_length=10,
+        json_schema_extra={"uniqueItems": True},
+    )
 
     @field_validator("tags")
     @classmethod
@@ -98,22 +128,31 @@ class GroupTagsReplace(BaseModel):
 
 
 class GroupMemberCreate(BaseModel):
-    userId: str | None = Field(default=None, min_length=1)
+    userId: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional target user; defaults to the authenticated user",
+        example="usr_a1b2c3d4e5f6",
+    )
 
 
 class GroupMember(BaseModel):
-    id: str
-    username: str
-    role: GroupMemberRole
-    joinedAt: datetime
+    id: str = Field(..., example="usr_a1b2c3d4e5f6")
+    username: str = Field(..., example="alex")
+    role: GroupMemberRole = Field(..., description="Membership role")
+    joinedAt: datetime = Field(..., description="Time the user joined the group")
 
 
 class Group(BaseModel):
-    id: str
-    ownerId: str
-    name: str
-    description: str
-    tags: list[GroupTag]
+    id: str = Field(..., example="grp_123")
+    ownerId: str = Field(..., example="usr_a1b2c3d4e5f6")
+    name: str = Field(..., example="Indie Music Lovers")
+    description: str = Field(..., example="Discover and discuss indie music")
+    tags: list[GroupTag] = Field(
+        ...,
+        max_length=10,
+        json_schema_extra={"uniqueItems": True},
+    )
 
 
 class GroupRecord(BaseModel):

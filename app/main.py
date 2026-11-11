@@ -11,10 +11,14 @@ from app.routers.search import router as search_router
 from app.routers.music import router as music_router
 from app.routers.chats import router as chats_router
 from app.routers.recommendations import router as recommendations_router
+from app.core.openapi import API_DESCRIPTION, TAGS_METADATA
 
 app = FastAPI(
     title="ErasMusic API",
+    description=API_DESCRIPTION,
     version="1.0.0",
+    openapi_tags=TAGS_METADATA,
+    servers=[{"url": "/", "description": "Current API base path"}],
 )
 
 app.include_router(health_router)

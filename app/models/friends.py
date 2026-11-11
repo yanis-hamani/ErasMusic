@@ -36,20 +36,25 @@ class PaginatedFriendsResponse(BaseModel):
 
 
 class FriendshipStatus(BaseModel):
-    userId: str = Field(..., example="usr_456")
-    status: FriendshipStatusEnum
+    userId: str = Field(..., description="Target user identifier", example="usr_456")
+    status: FriendshipStatusEnum = Field(..., example="friends")
 
 
 class FriendRequestCreate(BaseModel):
-    targetUserId: str = Field(..., min_length=1, example="usr_456")
+    targetUserId: str = Field(
+        ...,
+        min_length=1,
+        description="User who should receive the request",
+        example="usr_456",
+    )
 
 
 class FriendRequest(BaseModel):
-    requestId: str = Field(..., example="req_a1b2c3d4e5f6")
-    senderId: str = Field(..., example="usr_123")
-    targetUserId: str = Field(..., example="usr_456")
-    status: FriendRequestStatusEnum
-    createdAt: datetime
+    requestId: str = Field(..., description="Unique request identifier", example="req_789")
+    senderId: str = Field(..., description="Request sender", example="usr_123")
+    targetUserId: str = Field(..., description="Request recipient", example="usr_456")
+    status: FriendRequestStatusEnum = Field(..., example="pending")
+    createdAt: datetime = Field(..., description="Request creation time")
 
 
 class PaginatedFriendRequestsResponse(BaseModel):

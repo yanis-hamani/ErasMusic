@@ -4,7 +4,12 @@ import jwt
 
 from app.core.security import decode_token
 
-bearer_scheme = HTTPBearer(auto_error=False, scheme_name="BearerAuth")
+bearer_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="BearerAuth",
+    bearerFormat="JWT",
+    description="JWT access token returned by register, login, or refresh",
+)
 
 async def verify_access_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),

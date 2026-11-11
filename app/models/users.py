@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, model_validator
 
 
 class UserRecord(BaseModel):
@@ -32,6 +32,8 @@ class PrivateUserProfile(PublicUserProfile):
 
 
 class UserProfileUpdate(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"minProperties": 1})
+
     avatarUrl: HttpUrl | None = Field(
         default=None,
         description="URL of the user's avatar image. Set to null to clear it.",

@@ -2,6 +2,11 @@
 
 ErasMusic is a social media platform that lets you meet new people through shared musical tastes.
 
+## Documentation
+
+- [Architecture](doc/architecture.md)
+- [Functional behavior](doc/functional.md)
+
 ## Quick start
 
 1. Create your local environment file:
@@ -119,4 +124,3 @@ or when a seed import fails partway through.
 Database credentials are initialized when volumes are created. Changing `.env`
 does not update credentials in existing volumes. Reset the volumes and start the
 stack again.
-
