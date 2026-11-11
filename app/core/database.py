@@ -1,4 +1,3 @@
-# app/database.py
 import os
 import asyncpg
 from typing import AsyncGenerator

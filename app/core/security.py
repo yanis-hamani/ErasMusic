@@ -4,13 +4,11 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 
-# In production, ensure these are loaded from environment variables
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-super-secret-key-change-me")
+SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-# Passlib configuration for bcrypt
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
