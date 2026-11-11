@@ -1,12 +1,13 @@
-# TODO:  AJOUTER USERNAME a NEO4J
-
 import csv
 import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
+from pathlib import Path
+
 from faker import Faker
 
 fake = Faker()
+OUTPUT_DIR = Path(__file__).resolve().parent
 
 # ==========================================
 # CONFIGURATION - Scale these as needed
@@ -25,7 +26,11 @@ GENRES = ['Synthwave', 'Retrowave', 'Cyberpunk', 'House', 'Techno', 'Rock', 'Jaz
 # ==========================================
 def write_csv(filename, data, fieldnames):
     print(f"Writing {filename}...")
-    with open(filename, mode='w', newline='', encoding='utf-8') as f:
+    with (OUTPUT_DIR / filename).open(
+        mode='w',
+        newline='',
+        encoding='utf-8',
+    ) as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(data)
@@ -38,9 +43,16 @@ print("Generating Entities...")
 # StrongPassword123
 known_password_hashed = '$argon2id$v=19$m=65536,t=3,p=4$KaWUkrI2JqT03ptzDgHA2A$nx23EtGHpVMkwnIkxkU/UJZMcAZNmAzBf/bxA72b4cw'
 
-# Users
-users = []
-for _ in range(NUM_USERS):
+# Users. The fixed demo account always has the password StrongPassword123.
+users = [{
+    'id': 'user_demo',
+    'username': 'demo',
+    'email': 'demo@example.com',
+    'password_hash': known_password_hashed,
+    'avatar_url': fake.image_url(),
+    'bio': 'Seeded account for exploring ErasMusic.'
+}]
+for _ in range(NUM_USERS - 1):
     users.append({
         'id': f"user_{uuid.uuid4().hex[:12]}",
         'username': fake.unique.user_name() + str(random.randint(10, 99)), # ensure length >= 3
@@ -123,11 +135,15 @@ print("Generating Relationships...")
 
 friends_rels = []
 for u_id in user_ids:
-    # 0 to 5 friends per user
-    friends = random.sample(user_ids, random.randint(0, 5))
+    available_friends = [candidate for candidate in user_ids if candidate != u_id]
+    friend_count = random.randint(2, 5) if u_id == 'user_demo' else random.randint(0, 5)
+    friends = random.sample(available_friends, friend_count)
     for f_id in friends:
-        if u_id != f_id:
-            friends_rels.append({'from': u_id, 'to': f_id, 'closeness': round(random.uniform(0.1, 1.0), 2)})
+        friends_rels.append({
+            'from': u_id,
+            'to': f_id,
+            'closeness': round(random.uniform(0.1, 1.0), 2)
+        })
 
 listen_rels = []
 for u_id in user_ids:
@@ -139,6 +155,20 @@ for u_id in user_ids:
 
 song_artist_rels = [{'song_id': s['id'], 'artist_id': random.choice(artist_ids)} for s in songs]
 song_genre_rels = [{'song_id': s['id'], 'genre_id': random.choice(genre_ids)} for s in songs]
+group_tag_rels = []
+for group in groups:
+    for artist_id in random.sample(artist_ids, random.randint(1, 3)):
+        group_tag_rels.append({
+            'chat_id': group['psqlChatId'],
+            'tag_type': 'artist',
+            'tag_id': artist_id,
+        })
+    for genre_id in random.sample(genre_ids, random.randint(1, 2)):
+        group_tag_rels.append({
+            'chat_id': group['psqlChatId'],
+            'tag_type': 'genre',
+            'tag_id': genre_id,
+        })
 
 # Filter group chat participants specifically for Neo4j PARTS_OF
 group_chat_ids = [g['psqlChatId'] for g in groups]
@@ -176,5 +206,10 @@ write_csv('neo4j_rel_listen.csv', listen_rels, ['user_id', 'song_id', 'short', '
 write_csv('neo4j_rel_song_artist.csv', song_artist_rels, ['song_id', 'artist_id'])
 write_csv('neo4j_rel_song_genre.csv', song_genre_rels, ['song_id', 'genre_id'])
 write_csv('neo4j_rel_parts_of.csv', parts_of_rels, ['chat_id', 'user_id', 'role', 'joined_at'])
+write_csv(
+    'neo4j_rel_group_tags.csv',
+    group_tag_rels,
+    ['chat_id', 'tag_type', 'tag_id'],
+)
 
 print("Successfully generated all CSVs!")

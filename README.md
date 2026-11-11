@@ -1,94 +1,122 @@
-Use bolt protocol in neo4j browser
-TODO: Update README with PSQL procedure
-
-
-docker compose --profile seed up
-docker compose up
-
-
-sudo chown -R $USER:$USER ./scripts/seeding
-sudo chmod -R 777 ./scripts/seeding
-
 # ErasMusic
 
-REST API built with **FastAPI** and **Neo4j**, running with Docker Compose.
+ErasMusic is a social media platform that lets you meet new people through shared musical tastes.
 
-## Prerequisites
+## Quick start
 
-- [Docker](https://www.docker.com/products/docker-desktop/)
-- Git
+1. Create your local environment file:
 
-## Installation
+   ```bash
+   cp .env.example .env
+   ```
 
-### 1. Clone the repository
+   The example values are suitable for local development. Change them if the
+   project will run outside your machine.
 
-```bash
-git clone <repository-url>
-cd <repository-folder>
-```
+2. Choose one startup mode.
 
-### 2. Configure environment variables
+   **Start with sample data** (recommended when exploring the API):
 
-Create a `.env` file from the example:
+   ```bash
+   docker compose --profile seed up -d --build
+   docker compose logs -f postgres-seed neo4j-seed
+   ```
 
-```bash
-cp .env.example .env
-```
+   Wait for both seed services to report that seeding is complete.
 
-Set your Neo4j password in `.env`:
+   The sample dataset contains a stable account with listening activity,
+   friendships, chats, and recommendation data:
 
-```env
-NEO4J_PASSWORD=your_password
-```
+   - Username: `demo`
+   - Email: `demo@example.com`
+   - Password: `StrongPassword123`
 
-Each developer has their own local configuration and database.
+   **Start with empty databases:**
 
-### 3. Start the application
+   ```bash
+   docker compose up -d --build
+   ```
 
-Make sure Docker is running, then execute:
+4. Verify the API and both databases:
 
-```bash
-docker compose up -d --build
-```
+   ```bash
+   curl http://localhost:8000/health
+   ```
 
-This will automatically start Neo4j and the FastAPI server.
+   A successful response reports both PostgreSQL and Neo4j as connected.
 
-### 4. Access the application
+## Service URLs
 
-| Service | URL |
+| Service | Address |
 |---|---|
-| Swagger UI (API documentation) | http://localhost:8000/docs |
-| Neo4j Browser | http://localhost:7474 |
+| Swagger UI | <http://localhost:8000/docs> |
+| ReDoc | <http://localhost:8000/redoc> |
+| Health check | <http://localhost:8000/health> |
+| Neo4j Browser | <http://localhost:7474> |
+| PostgreSQL | `localhost:5432` |
+| Neo4j Bolt | `bolt://localhost:7687` |
 
-**Neo4j credentials:**
+Neo4j Browser credentials:
+
 - Username: `neo4j`
-- Password: The password defined in your `.env` file.
+- Password: the `NEO4J_PASSWORD` value in `.env`
+- Connection URL: `bolt://localhost:7687`
 
-## Useful Commands
+PostgreSQL development connection:
 
-**Start the application:**
+- Username: the `POSTGRES_USER` value in `.env` (default: `myuser`)
+- Database: the `POSTGRES_DB` value in `.env` (default: `mydatabase`)
+- Password: the `POSTGRES_PASSWORD` value in `.env`
+
+## Development workflow
+
+The `app/` and `tests/` directories are mounted into the API container, and
+Uvicorn runs with reload enabled. Python source and test changes are available
+without rebuilding the image.
+
+Rebuild only after changing `Dockerfile` or `requirements.txt`:
+
 ```bash
-docker compose up -d
+docker compose up --build
 ```
 
-**Rebuild after code changes:**
+## Running tests
+
+When the API container is running:
+
 ```bash
-docker compose up -d --build
+docker compose exec api python -m unittest discover -v
 ```
 
-**Stop the application:**
+Without an existing API container:
+
 ```bash
-docker compose down
+docker compose run --rm api python -m unittest discover -v
 ```
 
-**View logs:**
+### Reset and reseed
+
+The following command permanently deletes all local PostgreSQL and Neo4j data:
+
 ```bash
-docker compose logs -f
+docker compose down -v --remove-orphans
 ```
 
-## Notes
+Then recreate and seed everything:
 
-- Each developer runs their own local Neo4j database.
-- Database data persists when containers are stopped or recreated.
-- The `.env` file must not be committed to Git.
-- Changing the password in `.env` does not reset the password of an existing Neo4j database.
+```bash
+docker compose --profile seed up -d --build
+docker compose logs -f postgres-seed neo4j-seed
+```
+
+Use the same reset procedure after changing PostgreSQL initialization scripts
+or when a seed import fails partway through.
+
+## Troubleshooting
+
+### A password change is ignored
+
+Database credentials are initialized when volumes are created. Changing `.env`
+does not update credentials in existing volumes. Reset the volumes and start the
+stack again.
+
