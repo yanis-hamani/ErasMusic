@@ -15,6 +15,27 @@ CREATE TABLE refresh_tokens (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE spotify_connections (
+    user_id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    spotify_user_id VARCHAR(255) NOT NULL UNIQUE,
+    access_token_encrypted TEXT NOT NULL,
+    refresh_token_encrypted TEXT NOT NULL,
+    access_token_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    scopes TEXT NOT NULL,
+    connected_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_successful_sync_at TIMESTAMP WITH TIME ZONE,
+    sync_started_at TIMESTAMP WITH TIME ZONE,
+    last_sync_error TEXT,
+    reconnect_required BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE spotify_oauth_states (
+    state_hash VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE chats (
     id VARCHAR(50) PRIMARY KEY,
     type chat_type_enum NOT NULL DEFAULT 'direct',
@@ -48,6 +69,7 @@ CREATE INDEX idx_chat_messages_chat_id_created_at ON chat_messages(chat_id, crea
 
 -- Fast lookup for when we verify or delete a token during refresh/logout
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_spotify_oauth_states_expires_at ON spotify_oauth_states(expires_at);
 
 -- Some constraint on top of my head, we may implement more to ensure data quality
 CREATE OR REPLACE FUNCTION check_direct_chat_limit()

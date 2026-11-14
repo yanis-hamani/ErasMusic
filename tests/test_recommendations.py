@@ -270,7 +270,8 @@ class RecommendationRepositoryTests(unittest.IsolatedAsyncioTestCase):
 
         query, parameters = transaction.calls[0]
         self.assertEqual(buckets[0].users[0].id, "usr_candidate")
-        self.assertIn("currentListen[$score_property]", query)
+        self.assertIn("currentPreference[$score_property]", query)
+        self.assertIn("TOP_ARTIST", query)
         self.assertIn("candidateAffinity DESC", query)
         self.assertIn("NOT EXISTS", query)
         self.assertIn("[0..20]", query)
@@ -342,6 +343,7 @@ class RecommendationRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("NOT EXISTS", query)
         self.assertIn("MATCH (current)-[:PARTS_OF]->(group)", query)
         self.assertIn("currentAffinity DESC", query)
+        self.assertIn("TOP_ARTIST", query)
         self.assertIn("[0..20]", query)
 
 

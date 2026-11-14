@@ -6,6 +6,7 @@ from app.repositories.register_hashed_repository import RegisterHashedRepository
 from app.repositories.user_neo_repository import UserNeoRepository
 from app.models.auth import RegisterRequest, RegisterHashed, RefreshToken, UserNeo, UserIdentity, AuthTokenResponse, AuthLoginRequest, RefreshResponse
 from app.core.security import hash_password, create_access_token, create_refresh_token, hash_refresh_token, verify_password, decode_token
+from app.services.spotify_services import SpotifyService
 import asyncpg
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
@@ -21,6 +22,7 @@ class AuthService:
             user_psql_repository: UserPsqlRepository,
             register_hashed_repository: RegisterHashedRepository,
             refresh_token_repository: RefreshTokenRepository,
+            spotify_service: SpotifyService,
         ):
         self.pg_pool = pg_pool
         self.neo4j_driver = neo4j_driver
@@ -28,6 +30,7 @@ class AuthService:
         self.user_psql_repository = user_psql_repository
         self.register_hashed_repository = register_hashed_repository
         self.refresh_token_repository = refresh_token_repository
+        self.spotify_service = spotify_service
 
     def __create_tokens(self, user_id: str) -> tuple[str, RefreshToken, str]:
             access_token = create_access_token({"sub": user_id})
@@ -97,6 +100,7 @@ class AuthService:
             await self.refresh_token_repository.save(conn, refresh_token_object)
 
         identity = UserIdentity(id=user_id, username=register_hashed.username, email=register_hashed.email)
+        await self.spotify_service.synchronize_after_login(user_id)
         return AuthTokenResponse(user=identity, accessToken=access_token), refresh_token
 
 
@@ -149,4 +153,3 @@ class AuthService:
                 )
             refresh_token_object = RefreshToken(user_id=current_user.id, hashed_token=hashed_refresh)
             await self.refresh_token_repository.delete(conn, refresh_token_object)
-

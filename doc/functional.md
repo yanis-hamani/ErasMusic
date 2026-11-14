@@ -20,7 +20,10 @@ token in PostgreSQL.
 | Chats | Create direct or standalone group chats, manage participants and exchange messages |
 | Search | Find users and groups |
 | Music | Read artists, songs and genres stored in Neo4j |
+| Spotify | Optionally link Spotify, import top tracks/artists and search its live catalog |
 | Recommendations | Discover non-friends and unjoined groups by music or social paths |
+
+TODO: Chat section should be more clear
 
 Direct chats require an existing friendship and are unique for a user pair.
 Only participants can read a chat or send messages. Membership of a group-owned
@@ -30,6 +33,59 @@ List endpoints return pagination metadata. Validation and business failures use
 standard HTTP responses: `401` for invalid authentication, `403` for forbidden
 actions, `404` for missing resources, `409` for state conflicts and `422` for
 invalid input.
+
+## Spotify integration
+
+Spotify linking is optional and happens after normal ErasMusic authentication.
+It uses the server-side Authorization Code flow with the `user-top-read` and
+`user-read-private` scopes. ErasMusic credentials and Spotify credentials are
+independent.
+
+| Route | Behavior |
+|---|---|
+| `GET /spotify/connect` | Returns a Spotify authorization URL containing a single-use, ten-minute state; requires ErasMusic authentication |
+| `GET /spotify/callback` | Exchanges the code, stores encrypted tokens and attempts the initial synchronization; the state authenticates this public callback |
+| `GET /spotify/status` | Reports whether Spotify is connected, the last successful sync, an active sync, the last error and whether reconnection is required |
+| `POST /spotify/sync` | Forces a synchronization even if one already succeeded that UTC day |
+| `DELETE /spotify/disconnect` | Deletes credentials and the user's imported affinity relationships, while retaining shared catalog nodes |
+| `GET /spotify/search` | Searches either Spotify tracks or artists; results are returned without being persisted |
+
+### Top-item synchronization
+
+A synchronization requests the top 50 tracks and top 50 artists for each
+Spotify range: `short_term`, `medium_term`, and `long_term`. The six requests
+are made concurrently. Rank is converted directly to affinity (`1 → 50`,
+`2 → 49`, ..., `50 → 1`). Local items and malformed items without Spotify IDs
+are ignored without changing the rank of later items.
+
+Missing songs and artists are added to Neo4j using Spotify IDs. Artist genres
+are imported when Spotify supplies them, normalized case-insensitively and
+linked to both the artist and any synchronized track whose artist metadata is
+available. Genre import is best effort because Spotify track payloads do not
+contain genres directly.
+
+Each period is a full replacement: old scores for that period are cleared,
+current scores are written and relationships with zero scores in every period
+are removed. A single Neo4j transaction protects the graph from partial
+multi-period updates.
+
+Synchronization runs:
+
+- immediately after a successful first authorization;
+- during login when no synchronization has succeeded on the current UTC day;
+- whenever the user requests the manual sync endpoint.
+
+Login waits for that day's sync attempt, but Spotify outages, rate limits and
+token failures never prevent login. Only a successful sync satisfies the daily
+guard, so a failed attempt can be retried at a later login. Manual sync bypasses
+the guard but returns an error when another sync is already active. Expired
+access tokens are refreshed automatically; an invalid refresh grant marks the
+connection as requiring authorization again.
+
+Live catalog search uses an application token, supports only `track` and
+`artist`, and does not require the user to link a personal Spotify account.
+Spotify must still be configured on the server, and the route itself requires
+ErasMusic authentication.
 
 ## Recommendation system
 
@@ -49,7 +105,7 @@ genre.
 ### Music periods and affinity
 
 Music-based routes require a `period` query parameter. It selects one property
-from each `LISTEN_TO` relationship:
+from the relevant `LISTEN_TO` or `TOP_ARTIST` relationship:
 
 | Period | Neo4j score |
 |---|---|
@@ -57,9 +113,12 @@ from each `LISTEN_TO` relationship:
 | `medium_term` | `mediumTermScore` |
 | `long_term` | `longTermScore` |
 
-Only positive scores participate. Artist and genre affinity is the sum of the
-selected scores for the user's matching songs. This makes strongly represented
-artists or genres appear before weaker ones for the selected period.
+Only positive scores participate. Song recommendations use direct `LISTEN_TO`
+scores. Artist recommendations and artist-tagged groups use direct
+`TOP_ARTIST` scores. Genre-tagged groups traverse
+`TOP_ARTIST → Artists → RELATED_TO → Genre` and sum the selected artist scores
+for each genre. This avoids inferring artist and genre preference only from
+imported tracks.
 
 ### Candidate rules
 
@@ -84,9 +143,11 @@ remain grouped under every applicable friend.
 ```mermaid
 flowchart LR
     User[Authenticated user] --> Basis{Recommendation basis}
-    Basis -->|Music| Scores[Select period and positive LISTEN_TO scores]
+    Basis -->|Songs| Songs[Select positive LISTEN_TO score for period]
+    Basis -->|Artists or genres| Artists[Select positive TOP_ARTIST score for period]
     Basis -->|Social| Paths[Traverse FRIENDS_WITH]
-    Scores --> Match[Match shared music or group tags]
+    Songs --> Match[Match shared songs]
+    Artists --> Match[Match shared artists or artist genres]
     Paths --> Match2[Match friends-of-friends or friends' groups]
     Match --> Filter[Remove existing friends or joined groups]
     Match2 --> Filter

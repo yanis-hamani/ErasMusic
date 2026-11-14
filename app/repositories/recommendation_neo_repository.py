@@ -40,13 +40,11 @@ class RecommendationNeoRepository:
         result = await transaction.run(
             """
             MATCH (current:User {psqlId: $user_id})
-                  -[currentListen:LISTEN_TO]->(:Song)
-                  -[:PERFORMED_BY]->(artist:Artists)
-            WHERE coalesce(currentListen[$score_property], 0) > 0
+                  -[currentPreference:TOP_ARTIST]->(artist:Artists)
+            WHERE coalesce(currentPreference[$score_property], 0) > 0
             WITH DISTINCT current, artist
-            MATCH (candidate:User)-[candidateListen:LISTEN_TO]->(:Song)
-                  -[:PERFORMED_BY]->(artist)
-            WHERE coalesce(candidateListen[$score_property], 0) > 0
+            MATCH (candidate:User)-[candidatePreference:TOP_ARTIST]->(artist)
+            WHERE coalesce(candidatePreference[$score_property], 0) > 0
               AND candidate <> current
               AND NOT EXISTS {
                   MATCH (current)-[:FRIENDS_WITH]-(candidate)
@@ -69,15 +67,13 @@ class RecommendationNeoRepository:
         result = await transaction.run(
             """
             MATCH (current:User {psqlId: $user_id})
-                  -[currentListen:LISTEN_TO]->(:Song)
-                  -[:PERFORMED_BY]->(artist:Artists)
-            WHERE coalesce(currentListen[$score_property], 0) > 0
+                  -[currentPreference:TOP_ARTIST]->(artist:Artists)
+            WHERE coalesce(currentPreference[$score_property], 0) > 0
             WITH current,
                  artist,
-                 sum(toFloat(currentListen[$score_property])) AS currentAffinity
-            MATCH (candidate:User)-[candidateListen:LISTEN_TO]->(:Song)
-                  -[:PERFORMED_BY]->(artist)
-            WHERE coalesce(candidateListen[$score_property], 0) > 0
+                 toFloat(currentPreference[$score_property]) AS currentAffinity
+            MATCH (candidate:User)-[candidatePreference:TOP_ARTIST]->(artist)
+            WHERE coalesce(candidatePreference[$score_property], 0) > 0
               AND candidate <> current
               AND NOT EXISTS {
                   MATCH (current)-[:FRIENDS_WITH]-(candidate)
@@ -85,7 +81,7 @@ class RecommendationNeoRepository:
             WITH artist,
                  currentAffinity,
                  candidate,
-                 sum(toFloat(candidateListen[$score_property])) AS candidateAffinity
+                 toFloat(candidatePreference[$score_property]) AS candidateAffinity
             ORDER BY currentAffinity DESC,
                      artist.id,
                      candidateAffinity DESC,
@@ -306,9 +302,8 @@ class RecommendationNeoRepository:
         result = await transaction.run(
             """
             MATCH (current:User {psqlId: $user_id})
-                  -[listen:LISTEN_TO]->(:Song)
-                  -[:PERFORMED_BY]->(artist:Artists)
-            WHERE coalesce(listen[$score_property], 0) > 0
+                  -[preference:TOP_ARTIST]->(artist:Artists)
+            WHERE coalesce(preference[$score_property], 0) > 0
             WITH DISTINCT current, artist
             MATCH (group:Group)-[:TAGGED_WITH]->(artist)
             WHERE group.id IS NOT NULL
@@ -333,12 +328,11 @@ class RecommendationNeoRepository:
         result = await transaction.run(
             """
             MATCH (current:User {psqlId: $user_id})
-                  -[listen:LISTEN_TO]->(:Song)
-                  -[:PERFORMED_BY]->(artist:Artists)
-            WHERE coalesce(listen[$score_property], 0) > 0
+                  -[preference:TOP_ARTIST]->(artist:Artists)
+            WHERE coalesce(preference[$score_property], 0) > 0
             WITH current,
                  artist,
-                 sum(toFloat(listen[$score_property])) AS currentAffinity
+                 toFloat(preference[$score_property]) AS currentAffinity
             MATCH (group:Group)-[:TAGGED_WITH]->(artist)
             WHERE group.id IS NOT NULL
               AND NOT EXISTS {
@@ -397,9 +391,9 @@ class RecommendationNeoRepository:
         result = await transaction.run(
             """
             MATCH (current:User {psqlId: $user_id})
-                  -[listen:LISTEN_TO]->(:Song)
+                  -[preference:TOP_ARTIST]->(:Artists)
                   -[:RELATED_TO]->(genre:Genre)
-            WHERE coalesce(listen[$score_property], 0) > 0
+            WHERE coalesce(preference[$score_property], 0) > 0
             WITH DISTINCT current, genre
             MATCH (group:Group)-[:TAGGED_WITH]->(genre)
             WHERE group.id IS NOT NULL
@@ -424,12 +418,12 @@ class RecommendationNeoRepository:
         result = await transaction.run(
             """
             MATCH (current:User {psqlId: $user_id})
-                  -[listen:LISTEN_TO]->(:Song)
+                  -[preference:TOP_ARTIST]->(:Artists)
                   -[:RELATED_TO]->(genre:Genre)
-            WHERE coalesce(listen[$score_property], 0) > 0
+            WHERE coalesce(preference[$score_property], 0) > 0
             WITH current,
                  genre,
-                 sum(toFloat(listen[$score_property])) AS currentAffinity
+                 sum(toFloat(preference[$score_property])) AS currentAffinity
             MATCH (group:Group)-[:TAGGED_WITH]->(genre)
             WHERE group.id IS NOT NULL
               AND NOT EXISTS {

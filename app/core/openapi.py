@@ -47,6 +47,10 @@ TAGS_METADATA = [
             "time-decayed friendship closeness in Neo4j."
         ),
     },
+    {
+        "name": "Spotify",
+        "description": "Spotify OAuth, top-item synchronization, and catalog search",
+    },
 ]
 
 UNAUTHORIZED_RESPONSE = {

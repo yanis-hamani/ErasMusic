@@ -32,7 +32,8 @@ SET song.title = row.title,
 // Import Genres
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_genres.csv' AS row
 MERGE (genre:Genre {id: row.id})
-SET genre.name = row.name;
+SET genre.name = row.name,
+    genre.normalizedName = toLower(trim(row.name));
 
 // ==========================================
 // 3. IMPORT RELATIONSHIPS
@@ -69,6 +70,22 @@ LOAD CSV WITH HEADERS FROM 'file:///neo4j_rel_song_genre.csv' AS row
 MATCH (s:Song {id: row.song_id})
 MATCH (g:Genre {id: row.genre_id})
 MERGE (s)-[:RELATED_TO]->(g);
+
+// Derive direct artist affinities from seeded track scores.
+MATCH (user:User)-[listen:LISTEN_TO]->(:Song)-[:PERFORMED_BY]->(artist:Artists)
+WITH user,
+     artist,
+     sum(coalesce(listen.shortTermScore, 0)) AS shortScore,
+     sum(coalesce(listen.mediumTermScore, 0)) AS mediumScore,
+     sum(coalesce(listen.longTermScore, 0)) AS longScore
+MERGE (user)-[preference:TOP_ARTIST]->(artist)
+SET preference.shortTermScore = shortScore,
+    preference.mediumTermScore = mediumScore,
+    preference.longTermScore = longScore;
+
+// Make seeded artist genres available to genre recommendations.
+MATCH (artist:Artists)<-[:PERFORMED_BY]-(:Song)-[:RELATED_TO]->(genre:Genre)
+MERGE (artist)-[:RELATED_TO]->(genre);
 
 // Parts Of (User -> Group)
 LOAD CSV WITH HEADERS FROM 'file:///neo4j_rel_parts_of.csv' AS row

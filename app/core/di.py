@@ -16,11 +16,18 @@ from app.services.chat_services import ChatService
 from app.repositories.recommendation_neo_repository import RecommendationNeoRepository
 from app.services.recommendation_services import RecommendationService
 from app.repositories.user_neo_repository import UserNeoRepository
+from app.clients.spotify_client import SpotifyClient, init_spotify_client
+from app.core.token_encryption import TokenCipher
+from app.repositories.spotify_neo_repository import SpotifyNeoRepository
+from app.repositories.spotify_psql_repository import SpotifyPsqlRepository
+from app.services.spotify_services import SpotifyService
 from dishka import Provider, Scope, provide
 
 class AppProvider(Provider):
     pg_pool = provide(staticmethod(init_pg_pool), scope=Scope.APP)
     neo4j_driver = provide(staticmethod(init_neo4j_driver), scope=Scope.APP)
+    spotify_client = provide(staticmethod(init_spotify_client), scope=Scope.APP)
+    token_cipher = provide(TokenCipher, scope=Scope.APP)
      
     # Dishka looks at the __init__ type hints and wires them automatically
     user_neo_repo = provide(UserNeoRepository, scope=Scope.REQUEST)
@@ -35,6 +42,8 @@ class AppProvider(Provider):
         RecommendationNeoRepository,
         scope=Scope.REQUEST,
     )
+    spotify_neo_repo = provide(SpotifyNeoRepository, scope=Scope.REQUEST)
+    spotify_psql_repo = provide(SpotifyPsqlRepository, scope=Scope.REQUEST)
 
     auth_service = provide(AuthService, scope=Scope.REQUEST)
     user_service = provide(UserService, scope=Scope.REQUEST)
@@ -44,3 +53,4 @@ class AppProvider(Provider):
     music_service = provide(MusicService, scope=Scope.REQUEST)
     chat_service = provide(ChatService, scope=Scope.REQUEST)
     recommendation_service = provide(RecommendationService, scope=Scope.REQUEST)
+    spotify_service = provide(SpotifyService, scope=Scope.REQUEST)

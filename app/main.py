@@ -11,6 +11,7 @@ from app.routers.search import router as search_router
 from app.routers.music import router as music_router
 from app.routers.chats import router as chats_router
 from app.routers.recommendations import router as recommendations_router
+from app.routers.spotify import router as spotify_router
 from app.core.openapi import API_DESCRIPTION, TAGS_METADATA
 
 app = FastAPI(
@@ -30,6 +31,7 @@ app.include_router(search_router)
 app.include_router(music_router)
 app.include_router(chats_router)
 app.include_router(recommendations_router)
+app.include_router(spotify_router)
 
 container = make_async_container(AppProvider())
 setup_dishka(container, app)

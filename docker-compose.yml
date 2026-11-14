@@ -123,6 +123,10 @@ services:
       NEO4J_PASSWORD: "${NEO4J_PASSWORD}"
       DATABASE_URL: postgresql://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mydatabase}
       SECRET_KEY: "${SECRET_KEY}"
+      SPOTIFY_CLIENT_ID: "${SPOTIFY_CLIENT_ID:-}"
+      SPOTIFY_CLIENT_SECRET: "${SPOTIFY_CLIENT_SECRET:-}"
+      SPOTIFY_REDIRECT_URI: "${SPOTIFY_REDIRECT_URI:-http://localhost:8000/spotify/callback}"
+      SPOTIFY_TOKEN_ENCRYPTION_KEY: "${SPOTIFY_TOKEN_ENCRYPTION_KEY:-}"
 
     depends_on:
       neo4j-init:

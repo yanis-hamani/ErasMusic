@@ -60,12 +60,19 @@ EXPECTED_OPERATION_IDS = {
     "sendChatMessage",
     "addChatMember",
     "leaveChat",
+    "connectSpotify",
+    "completeSpotifyAuthorization",
+    "getSpotifyStatus",
+    "syncSpotify",
+    "disconnectSpotify",
+    "searchSpotify",
 }
 PUBLIC_OPERATIONS = {
     "getHealth",
     "registerUser",
     "loginUser",
     "refreshAccessToken",
+    "completeSpotifyAuthorization",
 }
 
 
@@ -98,6 +105,7 @@ class OpenApiTests(unittest.TestCase):
                 "Recommendations",
                 "Search",
                 "Chat",
+                "Spotify",
             },
             {tag["name"] for tag in self.schema["tags"]},
         )
