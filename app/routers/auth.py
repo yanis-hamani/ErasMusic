@@ -48,11 +48,11 @@ async def register(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True, # TODO: Ensure you are using HTTPS, am I ?:
+        secure=True,
         samesite="lax"
     )
     return auth_response
- 
+
 @router.post(
     "/login",
     response_model=AuthTokenResponse,

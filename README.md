@@ -57,21 +57,22 @@ ErasMusic is a social media platform that lets you meet new people through share
 2. Add this redirect URI to the app settings exactly as written:
 
    ```text
-   http://localhost:8000/spotify/callback
+   http://127.0.0.1:8000/spotify/callback
    ```
 
-3. Generate a dedicated Fernet key. Do not reuse `SECRET_KEY`:
+3. Check Web API
+4. Generate a dedicated Fernet key. Do not reuse `SECRET_KEY`:
 
    ```bash
    python -c "import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
    ```
 
-4. Set the following values in your local `.env`:
+5. Set the following values in your local `.env`:
 
    ```dotenv
    SPOTIFY_CLIENT_ID=your-dashboard-client-id
    SPOTIFY_CLIENT_SECRET=your-dashboard-client-secret
-   SPOTIFY_REDIRECT_URI=http://localhost:8000/spotify/callback
+   SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/spotify/callback
    SPOTIFY_TOKEN_ENCRYPTION_KEY=the-generated-fernet-key
    ```
 

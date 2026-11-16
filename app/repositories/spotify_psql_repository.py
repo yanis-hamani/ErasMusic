@@ -127,15 +127,18 @@ class SpotifyPsqlRepository:
         row = await connection.fetchrow(
             """
             UPDATE spotify_connections
-            SET sync_started_at = $2,
+            SET sync_started_at = $2::timestamptz,
                 last_sync_error = NULL
             WHERE user_id = $1
               AND reconnect_required = FALSE
-              AND (sync_started_at IS NULL OR sync_started_at < $2 - INTERVAL '15 minutes')
               AND (
-                  $4
+                  sync_started_at IS NULL
+                  OR sync_started_at < ($2::timestamptz - INTERVAL '15 minutes')
+              )
+              AND (
+                  $4::boolean
                   OR last_successful_sync_at IS NULL
-                  OR (last_successful_sync_at AT TIME ZONE 'UTC')::date < $3
+                  OR (last_successful_sync_at AT TIME ZONE 'UTC')::date < $3::date
               )
             RETURNING *
             """,

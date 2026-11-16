@@ -12,6 +12,7 @@ from app.clients.spotify_client import SpotifyApiError, SpotifyClient
 from app.core.token_encryption import TokenCipher, TokenEncryptionError
 from app.models.spotify import SpotifySearchType
 from app.repositories.spotify_neo_repository import SpotifyNeoRepository
+from app.repositories.spotify_psql_repository import SpotifyPsqlRepository
 from app.services.spotify_services import SpotifyService
 
 
@@ -39,7 +40,7 @@ class SpotifyClientTests(unittest.IsolatedAsyncioTestCase):
             {
                 "SPOTIFY_CLIENT_ID": "client-id",
                 "SPOTIFY_CLIENT_SECRET": "client-secret",
-                "SPOTIFY_REDIRECT_URI": "http://localhost:8000/spotify/callback",
+                "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8000/spotify/callback",
             },
         ):
             client = SpotifyClient(httpx.AsyncClient())
@@ -49,7 +50,7 @@ class SpotifyClientTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(["state-value"], query["state"])
             self.assertEqual(["user-top-read user-read-private"], query["scope"])
             self.assertEqual(
-                ["http://localhost:8000/spotify/callback"],
+                ["http://127.0.0.1:8000/spotify/callback"],
                 query["redirect_uri"],
             )
         finally:
@@ -194,6 +195,36 @@ class SpotifyNeoRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("preference.shortTermScore = item.score", query)
         self.assertIn("TOP_ARTIST", query)
         self.assertIn("normalizedName", query)
+
+
+class RecordingPsqlConnection:
+    def __init__(self):
+        self.calls = []
+
+    async def fetchrow(self, query, *parameters):
+        self.calls.append((query, parameters))
+        return None
+
+
+class SpotifyPsqlRepositoryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_sync_claim_casts_prepared_statement_parameters(self):
+        connection = RecordingPsqlConnection()
+        now = datetime.now(timezone.utc)
+
+        result = await SpotifyPsqlRepository.claim_sync(
+            connection,
+            "usr_1",
+            now,
+            now.date(),
+            force=True,
+        )
+
+        self.assertIsNone(result)
+        query, parameters = connection.calls[0]
+        self.assertIn("$2::timestamptz - INTERVAL '15 minutes'", query)
+        self.assertIn("$3::date", query)
+        self.assertIn("$4::boolean", query)
+        self.assertEqual(("usr_1", now, now.date(), True), parameters)
 
 
 class LoginSyncTests(unittest.IsolatedAsyncioTestCase):
